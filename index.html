@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<!--
+  TIBABA (طبابة) — Public Storefront
+  Step 1 of build roadmap: index.html only (per execution rule).
+  Stack target: Cloudflare Pages (static) + Cloudflare Workers/KV (Step 4) + Supabase (Step 5).
+  Zero external styles.css — all styling is inline Tailwind utilities + the <style> block below.
+
+  FILE MAP (search anchors for surgical edits):
+    [HEAD]            meta/PWA tags, Tailwind config, fonts, design tokens
+    [TOPBAR]           thin utility bar
+    [HEADER]           logo, search, account/cart, mobile triggers
+    [CATSTRIP]         desktop category nav strip
+    [DRAWER]           mobile off-canvas category drawer (3-level catalog)
+    [SEARCHOVERLAY]    mobile search slide-down
+    [SHOPBYCAT]        category icon grid
+    [PRODUCTS]         tabbed product rail
+    [SELLCTA]          guest product-submission CTA banner
+    [WHY]              trust / value props
+    [INSTALLAPP]       PWA install CTA
+    [FOOTER]           link columns + contact + legal
+    [BOTTOMNAV]        fixed mobile tab bar
+    [MODAL-SUBMIT]     guest submission modal
+    [TOAST]            toast notification
+    [SCRIPT:DATA]      CATALOG + PRODUCTS + TRANSLATIONS
+    [SCRIPT:I18N]      language engine
+    [SCRIPT:RENDER]    DOM rendering
+    [SCRIPT:TRACKING]  analytics event hooks (stubbed, ready for Worker wiring)
+    [SCRIPT:PWA]       install prompt + iOS fallback
+-->
+<head>
+<!-- [HEAD] -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tibaba | طبابة — Medical Marketplace for Iraq</title>
+<meta name="description" content="Tibaba (طبابة) connects you with verified pharmacies, sellers, and warehouses across Iraq for medical devices, supplements, and everyday health essentials.">
+
+<!-- PWA -->
+<meta name="theme-color" content="#0E5C56">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tibaba">
+<link rel="manifest" href="manifest.json">
+<!-- apple-touch-icon / favicons to be generated from the logo in a later step -->
+
+<!-- Fonts: Plus Jakarta Sans + Inter (Latin), Cairo + Tajawal (Arabic), JetBrains Mono (prices/data) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          teal: {
+            50:  '#F1F8F7',
+            100: '#DCEFEC',
+            200: '#B8DFD9',
+            500: '#1FA89B',
+            600: '#168C82',
+            700: '#12736B',
+            800: '#0E5C56',
+            900: '#0A4642',
+            950: '#06302D'
+          },
+          cyan: { 100: '#D6F3F7', 400: '#4FCBDC', 500: '#22B8CE' },
+          sand: { 50: '#F8F7F2' },
+          ink:  { 900: '#0E1B19' },
+          slate:{ 500: '#5B6E6C', 600: '#475856' }
+        },
+        spacing: {
+          '4.5': '1.125rem',
+          '5.5': '1.375rem'
+        },
+        fontFamily: {
+          display: ['var(--font-display)', 'sans-serif'],
+          body: ['var(--font-body)', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace']
+        },
+        boxShadow: {
+          card: '0 1px 2px rgba(14,27,25,0.06), 0 8px 24px -12px rgba(14,27,25,0.12)',
+          lift: '0 12px 32px -10px rgba(14,27,25,0.22)'
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  :root[dir="ltr"]{ --font-display:'Plus Jakarta Sans'; --font-body:'Inter'; }
+  :root[dir="rtl"]{ --font-display:'Cairo'; --font-body:'Tajawal'; }
+
+  html { scroll-behavior: smooth; }
+  body { background:#F8F7F2; color:#0E1B19; }
+
+  .no-scrollbar::-webkit-scrollbar{ display:none; }
+  .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+
+  /* Visible keyboard focus everywhere, including inside dark sections */
+  :focus-visible{ outline:2px solid #22B8CE; outline-offset:2px; border-radius:4px; }
+
+  /* Signature element: EKG / vital-sign pulse line used as a structural divider */
+  .ekg-line{ stroke-dasharray: 1400; stroke-dashoffset: 1400; animation: ekg-draw 3.2s ease-out forwards, ekg-glow 2.6s ease-in-out 3.2s infinite; }
+  @keyframes ekg-draw { to { stroke-dashoffset: 0; } }
+  @keyframes ekg-glow { 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+
+  /* Topbar ticker: on mobile the promo line is too long to fit, so it scrolls like a news ticker
+     instead of being cropped. LTR text travels right-to-left; RTL text mirrors, travelling left-to-right. */
+  .ticker-track{ animation: ticker-ltr 13s linear infinite; }
+  [dir="rtl"] .ticker-track{ animation-name: ticker-rtl; }
+  @keyframes ticker-ltr{ 0%{ transform:translateX(100%); } 100%{ transform:translateX(-100%); } }
+  @keyframes ticker-rtl{ 0%{ transform:translateX(-100%); } 100%{ transform:translateX(100%); } }
+  @media (min-width:640px){ .ticker-track{ animation:none; transform:none; } }
+
+  @media (prefers-reduced-motion: reduce){
+    .ekg-line{ animation: none; stroke-dashoffset:0; opacity:.85; }
+    .ticker-track{ animation: none; transform:none; }
+    html{ scroll-behavior:auto; }
+  }
+
+  /* Guest modal + drawer transitions */
+  .sheet-enter{ transform:translateY(100%); }
+  .sheet-enter-active{ transform:translateY(0); transition:transform .32s cubic-bezier(.22,1,.36,1); }
+  .drawer-enter{ transform:translateX(-100%); }
+  [dir="rtl"] .drawer-enter{ transform:translateX(100%); }
+  .drawer-enter-active{ transform:translateX(0); transition:transform .3s cubic-bezier(.22,1,.36,1); }
+  .drawer-end-enter{ transform:translateX(100%); }
+  [dir="rtl"] .drawer-end-enter{ transform:translateX(-100%); }
+  .drawer-end-enter-active{ transform:translateX(0); transition:transform .3s cubic-bezier(.22,1,.36,1); }
+  .fade-enter{ opacity:0; } .fade-enter-active{ opacity:1; transition:opacity .25s ease; }
+
+  /* Bottom nav: respect iOS home-indicator safe area */
+  .safe-bottom{ padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+
+  /* Tabular numerals for price/SKU precision */
+  .nums{ font-variant-numeric: tabular-nums; }
+
+  details > summary{ list-style:none; cursor:pointer; }
+  details > summary::-webkit-details-marker{ display:none; }
+  details[open] .chev{ transform:rotate(90deg); }
+  [dir="rtl"] .chev{ transform:scaleX(-1); }
+  [dir="rtl"] details[open] .chev{ transform:scaleX(-1) rotate(90deg); }
+
+  .clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+</style>
+</head>
+
+<body class="font-body antialiased text-ink-900 pb-20 md:pb-0">
+
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 focus:z-[100] focus:bg-white focus:text-teal-800 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lift" data-i18n="skipToContent">Skip to content</a>
+
+<!-- ============================= [TOPBAR] ============================= -->
+<div class="bg-teal-950 text-teal-50 text-xs sm:text-sm">
+  <div class="max-w-7xl mx-auto px-4 h-9 flex items-center justify-between gap-4">
+    <div class="flex-1 min-w-0 overflow-hidden">
+      <p class="ticker-track inline-block whitespace-nowrap sm:block sm:truncate sm:w-full" data-i18n="topbarMsg">Verified medical sellers across Iraq · Cash on delivery available</p>
+    </div>
+    <div class="hidden sm:flex items-center gap-4 shrink-0">
+      <a href="tel:+9647701234567" dir="ltr" data-track="call" data-track-loc="topbar" class="hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>
+        <span class="nums">+964 770 123 4567</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= [HEADER] ============================= -->
+<header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-teal-900/10">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="h-16 md:h-20 flex items-center gap-3 md:gap-6">
+
+      <!-- Mobile drawer trigger -->
+      <button id="drawerOpenBtn" type="button" class="md:hidden -ms-1 p-2 text-ink-900" aria-label="Open categories" aria-controls="catDrawer" aria-expanded="false">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+
+      <!-- Logo (uploaded artwork, paths untouched — only display size/wrapper styling applied) -->
+      <a href="#main" class="flex items-center gap-2.5 shrink-0" data-i18n-aria="brandHome">
+        <svg class="h-11 w-auto md:h-14 shrink-0 text-teal-800" version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="1196.000000pt" height="1504.000000pt" viewBox="0 0 1196.000000 1504.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,1504.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M8220 12244 c-64 -37 -89 -62 -116 -119 -42 -88 -25 -205 41 -283 35
+-40 36 -44 33 -109 l-3 -68 -55 -12 c-30 -6 -75 -17 -100 -23 -25 -7 -52 -13
+-60 -14 -8 -1 -22 -5 -30 -8 -8 -3 -33 -11 -55 -18 -149 -47 -262 -134 -346
+-265 -63 -98 -78 -133 -81 -195 l-3 -55 70 -7 c89 -9 184 10 283 57 57 27 97
+57 183 140 105 102 166 142 195 131 11 -4 14 -55 14 -278 1 -219 12 -430 30
+-535 2 -15 197 73 233 104 15 15 17 40 17 252 0 130 3 293 7 364 l6 127 57 0
+c193 0 369 -102 413 -240 27 -83 22 -170 -13 -246 -62 -134 -169 -212 -526
+-382 -296 -141 -383 -193 -473 -284 -80 -80 -117 -138 -143 -223 -20 -65 -21
+-77 -10 -165 21 -161 98 -278 231 -349 81 -43 96 -41 109 12 17 69 -1 144 -58
+232 -39 61 -50 92 -50 143 1 156 159 280 575 453 246 102 404 196 488 289 120
+133 167 250 167 412 0 57 -6 126 -14 153 -43 163 -174 303 -351 378 -130 55
+-145 59 -263 64 -129 6 -132 9 -132 101 0 36 6 52 26 73 52 54 65 203 26 279
+-51 97 -117 139 -217 140 -46 0 -70 -6 -105 -26z m-470 -878 c0 -27 -42 -66
+-71 -66 -28 0 -23 27 10 61 36 36 61 38 61 5z"/>
+<path d="M5745 10474 c-33 -14 -115 -48 -183 -77 l-123 -51 3 -1056 c4 -1113
+2 -1077 50 -1240 40 -138 147 -270 281 -344 34 -19 105 -47 157 -61 89 -23
+110 -25 330 -25 263 0 337 12 460 72 62 30 173 129 228 201 l21 29 88 -89 c98
+-98 186 -151 307 -187 70 -21 88 -21 1161 -24 1068 -2 1092 -2 1190 18 113 24
+109 22 230 81 72 35 106 60 176 129 87 85 108 118 161 240 44 103 61 199 61
+345 -1 387 -177 662 -513 802 -135 56 -322 79 -475 58 -63 -8 -267 -64 -280
+-76 -5 -5 -15 -9 -22 -9 -22 0 -156 -70 -293 -153 -78 -47 -127 -85 -243 -190
+-48 -44 -90 -77 -93 -75 -2 3 -1 122 4 264 5 143 6 262 3 266 -3 4 -48 -13
+-98 -38 l-93 -44 0 -327 c0 -318 -1 -326 -22 -362 -12 -20 -60 -94 -107 -166
+-46 -71 -100 -159 -119 -195 -20 -36 -53 -91 -74 -122 l-39 -58 -207 0 c-180
+0 -215 3 -272 21 -159 50 -234 135 -267 304 -10 52 -13 185 -13 516 l0 447
+-107 -45 c-60 -25 -142 -60 -183 -77 -41 -17 -81 -35 -87 -39 -10 -6 -13 -104
+-13 -433 l0 -425 -31 -75 c-38 -92 -89 -140 -182 -172 -57 -19 -85 -22 -234
+-22 -145 0 -177 3 -228 21 -104 36 -180 132 -207 264 -10 46 -13 308 -13 1133
+0 946 -2 1072 -15 1072 -8 -1 -42 -12 -75 -26z m3875 -1584 c122 -41 227 -127
+278 -226 43 -84 54 -148 50 -282 -3 -105 -7 -136 -26 -177 -27 -58 -82 -119
+-132 -145 -95 -49 -116 -50 -846 -50 -756 0 -703 -5 -664 64 50 89 202 301
+280 388 56 65 263 246 336 295 103 70 235 125 359 149 102 20 282 12 365 -16z"/>
+<path d="M2488 10296 c-81 -48 -115 -94 -130 -176 -14 -84 3 -139 63 -201 110
+-114 295 -85 360 56 13 28 19 63 19 116 0 67 -3 81 -29 119 -15 23 -50 57 -77
+76 -43 29 -57 33 -109 33 -43 -1 -70 -7 -97 -23z"/>
+<path d="M3050 10290 c-140 -92 -162 -253 -51 -370 36 -38 59 -52 104 -65 53
+-15 61 -15 112 0 111 32 183 136 171 247 -9 88 -67 170 -145 204 -18 7 -59 14
+-90 14 -45 0 -64 -6 -101 -30z"/>
+<path d="M8533 10224 c-3 -9 -3 -47 0 -85 6 -69 7 -71 65 -134 84 -89 90 -144
+28 -248 -36 -63 -56 -77 -246 -182 -223 -124 -268 -154 -330 -222 -163 -178
+-166 -345 -10 -532 28 -33 60 -66 72 -72 16 -9 12 0 -15 31 -49 58 -77 135
+-77 213 0 51 7 76 35 135 60 125 143 188 402 306 217 99 280 145 345 255 93
+157 73 312 -57 446 -56 58 -110 89 -168 98 -29 4 -39 2 -44 -9z"/>
+<path d="M8340 10174 c-134 -72 -123 -39 -119 -332 3 -162 8 -251 14 -250 6 2
+52 25 103 52 71 37 94 54 100 75 11 40 8 494 -3 498 -6 1 -48 -18 -95 -43z"/>
+<path d="M3445 9655 c-93 -40 -176 -78 -182 -84 -8 -7 -13 -37 -13 -74 0 -36
+-5 -68 -12 -75 -8 -8 -46 -12 -104 -12 -172 0 -395 -50 -537 -121 -31 -16 -62
+-29 -67 -29 -22 0 -170 -97 -249 -164 -98 -82 -155 -156 -211 -271 -56 -114
+-73 -201 -67 -355 3 -108 8 -138 36 -220 54 -158 110 -234 236 -318 164 -109
+283 -145 470 -144 147 1 227 21 330 83 53 32 129 109 170 172 19 29 35 35 35
+13 0 -21 39 -105 75 -161 86 -136 220 -216 445 -264 83 -18 585 -10 665 11
+122 31 232 87 304 152 47 43 118 155 142 223 11 31 28 108 39 171 18 104 20
+161 20 613 0 275 -4 499 -8 499 -4 0 -12 -4 -17 -8 -6 -5 -57 -28 -115 -51
+-58 -24 -135 -57 -172 -73 l-67 -31 -3 -436 c-4 -430 -4 -437 -27 -496 -28
+-72 -109 -157 -168 -176 -24 -8 -120 -14 -261 -16 -206 -4 -227 -3 -285 17
+-34 11 -73 31 -88 43 -45 40 -89 115 -100 169 -5 29 -13 67 -16 83 -5 24 -14
+1010 -13 1338 0 37 -3 67 -7 66 -5 0 -84 -34 -178 -74z m-190 -692 c4 -54 5
+-199 3 -324 -5 -215 -6 -229 -29 -270 -27 -48 -99 -107 -174 -142 -83 -39
+-152 -50 -271 -45 -98 4 -116 8 -179 38 -111 53 -151 87 -202 170 -26 41 -28
+53 -27 145 0 86 4 108 26 157 28 61 35 71 84 121 65 67 95 87 219 146 163 78
+250 98 422 100 l121 1 7 -97z"/>
+<path d="M4483 7317 c-92 -34 -163 -130 -163 -220 0 -55 48 -154 95 -196 89
+-78 239 -65 315 27 59 72 77 189 41 267 -23 50 -85 109 -130 124 -43 14 -116
+13 -158 -2z"/>
+<path d="M6795 7311 c-101 -46 -149 -123 -143 -231 7 -131 97 -221 228 -228
+52 -3 75 0 106 16 83 42 133 118 141 213 9 97 -42 180 -144 233 -43 22 -137
+21 -188 -3z"/>
+<path d="M2000 6260 l0 -110 233 -2 232 -3 5 -605 5 -605 130 0 130 0 3 608 2
+607 240 0 240 0 0 110 0 110 -610 0 -610 0 0 -110z"/>
+<path d="M3480 5660 c0 -390 0 -713 0 -717 0 -5 56 -9 125 -11 l125 -3 0 721
+0 720 -125 0 -125 0 0 -710z"/>
+<path d="M4152 5653 l3 -718 460 0 c418 0 465 2 520 18 142 44 224 107 272
+211 25 54 28 72 28 161 -1 91 -4 106 -32 167 -35 74 -91 134 -152 163 -22 11
+-41 23 -41 26 0 3 20 26 44 51 24 25 56 72 72 104 26 53 29 69 29 159 0 90 -3
+105 -28 153 -37 70 -94 123 -172 161 -119 58 -150 61 -598 61 l-407 0 2 -717z
+m833 475 c94 -51 131 -165 82 -253 -16 -30 -37 -48 -82 -70 l-60 -30 -250 0
+-250 0 -3 175 c-1 96 0 181 3 188 8 22 518 13 560 -10z m59 -598 c71 -37 108
+-87 114 -155 6 -68 -9 -104 -59 -149 -60 -55 -108 -64 -382 -72 -134 -4 -256
+-4 -271 0 l-26 6 0 194 c0 146 3 196 13 200 6 3 136 4 287 3 272 -2 276 -2
+324 -27z"/>
+<path d="M6186 6343 c-7 -16 -91 -201 -186 -413 -94 -212 -201 -448 -237 -525
+-112 -237 -211 -464 -205 -469 3 -4 65 -6 137 -6 94 0 135 4 142 13 8 10 33
+65 128 283 8 19 22 33 37 36 38 7 610 9 651 2 l39 -6 74 -156 c41 -86 80 -160
+87 -164 7 -4 72 -8 145 -8 99 0 132 3 132 13 0 6 -23 59 -51 117 -55 113 -289
+621 -399 865 -37 83 -93 203 -124 269 -31 65 -60 131 -63 147 l-5 29 -144 0
+-143 0 -15 -27z m178 -325 c158 -355 226 -522 217 -531 -13 -13 -313 -22 -415
+-12 -78 7 -78 7 -73 33 2 15 18 59 35 97 85 193 166 385 179 423 9 23 20 42
+25 42 5 0 20 -24 32 -52z"/>
+<path d="M7357 6363 c-4 -3 -7 -328 -7 -720 l0 -714 453 3 c432 4 455 5 525
+26 190 58 273 140 302 300 12 67 1 167 -25 229 -28 66 -86 133 -142 165 l-55
+31 49 42 c27 24 62 67 78 96 28 51 30 61 30 164 0 100 -2 115 -28 167 -33 68
+-90 120 -172 159 -120 57 -142 59 -590 59 -227 0 -415 -3 -418 -7z m840 -240
+c140 -75 131 -273 -15 -330 -41 -16 -79 -18 -302 -18 l-255 0 -3 175 c-1 96 0
+180 3 188 4 11 53 13 267 10 249 -3 265 -4 305 -25z m48 -594 c161 -83 147
+-297 -23 -353 -40 -14 -92 -16 -323 -14 l-274 3 -3 175 c-1 96 0 185 3 198 l6
+23 282 -3 c280 -3 283 -3 332 -29z"/>
+<path d="M9402 6348 c-6 -13 -27 -57 -46 -98 -18 -41 -64 -140 -101 -220 -37
+-80 -109 -237 -160 -350 -51 -113 -145 -318 -208 -457 -64 -139 -118 -261
+-122 -273 -6 -19 -3 -20 134 -20 l141 0 38 83 c21 45 53 119 71 164 31 73 37
+82 65 87 46 8 678 -2 687 -11 4 -4 39 -75 77 -157 39 -82 77 -153 84 -157 7
+-5 73 -9 146 -9 105 0 132 3 132 14 0 7 -27 71 -61 142 -34 71 -149 318 -256
+549 -107 231 -221 478 -254 548 -33 70 -62 141 -66 158 l-5 29 -143 0 c-137 0
+-142 -1 -153 -22z m167 -320 c10 -24 33 -77 51 -118 18 -41 63 -145 100 -230
+38 -85 70 -161 72 -169 2 -9 -13 -19 -42 -28 -35 -11 -92 -13 -248 -10 -111 2
+-205 7 -209 10 -7 7 0 25 120 307 113 264 120 280 129 280 4 0 16 -19 27 -42z"/>
+<path d="M3900 4150 l0 -340 30 0 30 0 0 340 0 340 -30 0 -30 0 0 -340z"/>
+<path d="M3395 4462 c-3 -3 -5 -94 -5 -203 0 -108 -3 -204 -6 -213 -5 -13 -24
+-16 -101 -16 l-96 0 27 21 c57 45 74 133 36 182 -39 49 -155 59 -249 21 -37
+-14 -41 -20 -41 -50 0 -27 11 -46 50 -89 28 -30 50 -61 50 -69 0 -23 -163 -36
+-201 -16 -17 10 -19 22 -19 125 l0 115 -41 0 -41 0 4 -181 c3 -169 2 -181 -16
+-195 -11 -8 -32 -14 -48 -14 -25 0 -28 -3 -28 -34 0 -43 10 -49 61 -41 60 10
+100 50 106 105 l5 45 112 0 c68 0 119 5 132 12 16 9 30 9 65 -3 32 -12 74 -15
+157 -12 161 5 152 -12 152 283 l0 234 -30 -1 c-16 -1 -32 -3 -35 -6z m-227
+-268 c31 -22 29 -66 -7 -106 l-28 -32 -17 32 c-9 17 -30 48 -47 67 -22 25 -27
+36 -17 39 7 2 20 7 28 9 30 10 66 7 88 -9z"/>
+<path d="M3560 4210 l0 -261 38 3 37 3 0 255 0 255 -37 3 -38 3 0 -261z"/>
+<path d="M5100 4276 c0 -107 -4 -206 -10 -220 -9 -23 -15 -26 -63 -26 -29 0
+-58 5 -65 12 -8 8 -12 49 -12 121 l0 108 -37 -3 -38 -3 -5 -115 -5 -115 -70 0
+-70 0 -3 118 -3 117 -39 0 -40 0 0 -115 c0 -128 -4 -135 -75 -135 -73 0 -75 4
+-75 155 l0 135 -35 0 c-23 0 -35 -5 -35 -14 0 -9 -20 -15 -66 -20 -37 -4 -75
+-11 -86 -17 -74 -40 -77 -206 -4 -254 34 -22 98 -30 125 -16 19 10 25 9 41
+-11 17 -21 25 -23 128 -23 76 0 114 4 125 13 14 12 20 11 39 -2 29 -21 139
+-21 178 -1 25 13 32 13 57 0 40 -21 448 -22 498 -1 30 13 38 13 62 1 36 -19
+104 -19 148 -1 44 19 47 41 43 301 l-3 200 -37 3 -38 3 0 -219 c0 -240 2 -232
+-59 -232 -45 0 -58 19 -65 94 -4 38 -14 82 -24 98 -38 65 -161 82 -252 35 -29
+-15 -53 -27 -53 -27 -1 0 -2 55 -2 122 l0 123 -37 3 -38 3 0 -195z m-687 -130
+c-1 -37 -7 -64 -17 -74 -18 -19 -69 -20 -90 -2 -17 13 -22 86 -8 106 14 21 47
+34 82 31 l35 -2 -2 -59z m961 50 c40 -17 58 -57 54 -122 l-3 -49 -125 0 -125
+0 -3 48 c-3 44 0 51 31 81 54 51 115 66 171 42z"/>
+<path d="M5810 4210 l0 -260 35 0 35 0 0 260 0 260 -35 0 -35 0 0 -260z"/>
+<path d="M6998 4253 l-3 -218 -52 -3 -53 -3 0 171 0 171 -37 -3 -38 -3 -3
+-167 -2 -168 -60 0 -60 0 0 -40 0 -40 155 0 c120 0 163 4 185 15 27 14 32 14
+55 -1 32 -21 107 -14 135 11 19 17 21 17 41 -1 31 -28 158 -27 189 1 15 13 23
+16 28 8 15 -24 67 -33 188 -33 91 0 133 4 154 15 25 13 32 13 57 0 38 -20 71
+-19 117 5 39 19 39 19 64 0 34 -27 140 -28 173 -1 22 18 23 18 56 -2 27 -15
+47 -18 103 -15 109 6 105 -5 105 276 l0 237 -37 3 -38 3 -2 -218 -3 -218 -48
+-3 c-66 -4 -77 8 -77 80 0 81 -21 122 -77 149 -33 16 -54 20 -85 15 -92 -15
+-122 -50 -134 -157 -3 -35 -11 -70 -17 -76 -5 -7 -29 -13 -52 -13 -50 0 -55 8
+-55 81 0 89 -53 149 -132 149 -21 0 -38 2 -38 5 0 3 27 38 60 78 33 41 60 79
+60 85 0 6 -11 19 -26 28 -24 16 -26 16 -38 -2 -8 -10 -46 -59 -85 -108 -56
+-70 -71 -95 -71 -122 l0 -34 78 0 c101 0 114 -12 110 -96 l-3 -59 -124 -3
+c-151 -3 -161 2 -161 86 0 75 -24 120 -74 143 -23 10 -54 19 -71 19 -16 0 -48
+-9 -71 -19 -49 -22 -74 -68 -74 -138 0 -72 -20 -95 -78 -91 l-47 3 -3 218 -2
+217 -40 0 -40 0 -2 -217z m385 -54 c43 -19 61 -93 36 -142 -16 -30 -28 -37
+-66 -37 -73 0 -99 115 -38 167 30 26 35 27 68 12z m804 -13 c24 -21 28 -32 28
+-74 0 -35 -6 -56 -19 -71 -25 -28 -79 -28 -107 0 -18 18 -21 30 -17 77 8 87
+58 117 115 68z"/>
+<path d="M8597 4464 c-4 -4 -7 -121 -7 -261 l0 -253 40 0 40 0 -2 258 -3 257
+-30 3 c-17 2 -34 0 -38 -4z"/>
+<path d="M2550 4205 l0 -255 35 0 35 0 0 255 0 255 -35 0 -35 0 0 -255z"/>
+<path d="M4282 4448 c-17 -17 -15 -55 4 -66 43 -24 88 36 49 65 -23 16 -37 17
+-53 1z"/>
+<path d="M4390 4446 c-21 -26 -8 -61 24 -64 43 -5 61 32 30 62 -19 20 -38 20
+-54 2z"/>
+<path d="M2242 4418 c-30 -30 -2 -86 38 -73 15 5 20 15 20 40 0 41 -32 59 -58
+33z"/>
+<path d="M2340 4415 c-15 -18 -6 -61 15 -69 37 -14 65 26 45 64 -13 24 -42 26
+-60 5z"/>
+<path d="M9156 4414 c-9 -8 -16 -22 -16 -29 0 -15 27 -45 40 -45 15 0 40 31
+40 50 0 11 -9 24 -19 30 -25 13 -27 13 -45 -6z"/>
+<path d="M9262 4418 c-30 -30 -2 -86 38 -73 15 5 20 15 20 40 0 41 -32 59 -58
+33z"/>
+<path d="M6284 4366 c-3 -8 -4 -25 -2 -38 2 -18 10 -24 35 -26 28 -3 33 1 39
+23 4 15 1 31 -6 40 -16 19 -59 19 -66 1z"/>
+<path d="M6389 4359 c-8 -16 -8 -28 0 -45 18 -41 71 -25 71 21 0 44 -50 61
+-71 24z"/>
+<path d="M9532 4260 c-58 -26 -87 -88 -79 -171 8 -96 41 -125 146 -135 39 -4
+71 -10 71 -15 0 -4 -11 -21 -24 -36 -21 -25 -31 -28 -83 -28 -55 0 -58 -1 -61
+-26 -4 -37 20 -52 82 -51 88 1 144 40 153 110 l5 39 79 6 c44 4 88 11 98 17
+14 7 29 6 55 -5 44 -19 83 -19 118 -1 22 12 33 12 72 -1 54 -18 108 -11 137
+18 17 17 19 34 19 144 0 69 0 128 0 133 0 4 -15 8 -35 10 l-35 3 -1 -78 c0
+-43 -3 -96 -7 -118 -7 -38 -9 -40 -46 -43 -24 -2 -42 2 -47 10 -5 7 -9 50 -9
+96 l0 82 -35 0 -35 0 0 -69 c0 -100 -10 -121 -59 -121 -47 0 -51 8 -51 101 l0
+69 -40 0 -39 0 -3 -82 -3 -83 -67 -3 -68 -3 0 78 c0 92 -21 136 -75 159 -46
+19 -81 17 -133 -6z m125 -91 c7 -13 13 -50 13 -81 0 -53 -2 -58 -25 -64 -38
+-9 -93 4 -105 26 -15 27 -12 87 5 120 24 46 88 45 112 -1z"/>
+<path d="M2226 4240 c-77 -68 -68 -223 17 -266 19 -11 54 -17 90 -17 60 1 68
+-7 47 -47 -20 -37 -131 -52 -225 -30 -78 18 -107 95 -70 184 15 35 15 36 -15
+51 -28 14 -30 14 -44 -7 -22 -34 -38 -118 -31 -163 16 -109 75 -144 243 -145
+125 0 166 11 200 55 20 26 22 39 22 177 0 206 -19 238 -137 238 -55 0 -66 -3
+-97 -30z m148 -62 c11 -15 16 -45 16 -90 l0 -68 -44 0 c-62 0 -96 29 -96 81 0
+41 14 78 34 91 24 16 75 8 90 -14z"/>
+<path d="M6558 4153 l-3 -118 -169 -3 c-116 -2 -173 1 -182 9 -10 8 -14 36
+-14 95 l0 84 -35 0 -35 0 0 -104 c0 -96 2 -107 24 -133 l24 -28 180 -3 c196
+-4 254 5 274 41 8 14 13 67 13 147 l0 125 -37 3 -37 3 -3 -118z"/>
+<path d="M9146 4249 c-39 -31 -56 -71 -56 -134 0 -112 44 -157 155 -160 32 -1
+61 -7 62 -12 2 -6 -7 -24 -21 -39 -23 -28 -27 -29 -113 -28 -99 1 -156 16
+-178 47 -19 27 -19 83 0 137 19 53 20 47 -15 65 -28 15 -30 14 -46 -9 -26 -40
+-39 -143 -24 -195 24 -90 90 -121 257 -121 83 0 106 4 143 23 63 31 73 66 68
+227 -7 182 -31 220 -144 220 -47 0 -67 -5 -88 -21z m136 -66 c14 -13 18 -31
+18 -90 l0 -73 -45 0 c-36 0 -52 6 -72 26 -22 22 -25 32 -20 70 2 25 13 54 22
+64 22 24 72 26 97 3z"/>
+<path d="M4885 3880 c-37 -40 18 -105 60 -70 22 18 19 67 -4 80 -27 14 -35 13
+-56 -10z"/>
+<path d="M4597 3883 c-12 -12 -7 -60 8 -73 34 -28 84 30 55 65 -13 15 -51 20
+-63 8z"/>
+<path d="M4707 3883 c-14 -13 -7 -62 11 -71 35 -19 72 21 52 58 -10 19 -49 27
+-63 13z"/>
+<path d="M5261 3536 c-20 -24 -9 -51 19 -51 21 0 25 5 25 30 0 34 -24 45 -44
+21z"/>
+<path d="M2870 3330 c0 -203 1 -210 20 -210 17 0 20 7 20 39 0 36 30 91 50 91
+4 0 27 -29 49 -65 33 -52 46 -65 67 -65 17 0 23 4 18 13 -5 6 -29 45 -55 86
+l-48 74 50 59 c27 32 49 61 49 64 0 2 -11 4 -24 4 -17 0 -39 -19 -81 -70 -31
+-38 -61 -70 -66 -70 -5 0 -9 59 -9 130 0 123 -1 130 -20 130 -19 0 -20 -7 -20
+-210z"/>
+<path d="M4021 3521 c-10 -10 -22 -37 -26 -59 -4 -28 -12 -42 -27 -45 -27 -7
+-20 -41 10 -45 23 -4 24 -4 20 -128 -3 -123 -3 -124 20 -124 22 0 22 2 22 125
+l0 125 30 0 c25 0 30 4 30 25 0 22 -4 25 -36 25 -34 0 -36 1 -29 27 10 40 24
+54 50 47 16 -4 24 0 29 12 14 36 -60 48 -93 15z"/>
+<path d="M5140 3459 l0 -80 -26 20 c-76 59 -174 -14 -174 -129 0 -115 98 -188
+174 -129 l26 20 0 -20 c0 -14 6 -21 20 -21 19 0 20 7 20 210 0 203 -1 210 -20
+210 -18 0 -20 -7 -20 -81z m-26 -109 c29 -28 32 -107 7 -147 -18 -28 -26 -33
+-61 -33 -35 0 -43 4 -60 33 -24 38 -25 75 -5 122 22 55 76 66 119 25z"/>
+<path d="M5900 3330 c0 -203 1 -210 20 -210 19 0 20 7 20 210 0 203 -1 210
+-20 210 -19 0 -20 -7 -20 -210z"/>
+<path d="M7320 3330 c0 -203 1 -210 20 -210 19 0 20 7 20 210 0 203 -1 210
+-20 210 -19 0 -20 -7 -20 -210z"/>
+<path d="M9270 3275 c0 -258 1 -265 20 -265 19 0 20 7 20 265 0 258 -1 265
+-20 265 -19 0 -20 -7 -20 -265z"/>
+<path d="M2010 3321 c0 -193 1 -201 20 -201 18 0 20 8 22 142 l3 142 58 -118
+c35 -72 62 -116 70 -114 6 3 35 55 62 116 28 61 54 111 59 112 4 0 5 -34 1
+-75 -9 -95 2 -205 21 -205 7 0 15 4 19 10 3 5 2 95 -1 200 -5 137 -10 190 -19
+190 -7 0 -41 -61 -75 -135 -35 -74 -67 -135 -70 -135 -4 0 -35 60 -71 133 -93
+193 -99 189 -99 -62z"/>
+<path d="M4270 3320 c0 -193 1 -200 20 -200 19 0 20 7 20 135 0 74 3 135 8
+134 4 0 30 -49 59 -110 29 -60 56 -109 61 -109 5 0 34 53 65 118 l56 117 1
+-142 c0 -136 1 -143 20 -143 19 0 20 7 20 201 0 247 -5 251 -92 64 -33 -71
+-63 -133 -67 -137 -3 -4 -35 56 -70 133 -49 106 -68 139 -82 139 -18 0 -19
+-12 -19 -200z"/>
+<path d="M6164 3486 c-26 -26 -34 -42 -34 -71 0 -67 22 -92 113 -125 69 -26
+89 -55 64 -93 -9 -14 -28 -27 -42 -31 -28 -7 -101 9 -110 24 -10 16 -22 11
+-28 -11 -12 -44 105 -77 177 -49 53 20 74 115 36 163 -12 16 -45 34 -85 47
+-39 13 -69 30 -76 42 -14 27 -4 65 23 79 20 11 86 8 119 -5 11 -5 18 -1 22 14
+4 17 -1 24 -28 36 -19 8 -53 14 -76 14 -33 0 -47 -6 -75 -34z"/>
+<path d="M9527 3514 c-4 -4 -7 -94 -7 -201 l0 -193 25 0 25 0 -2 197 c-3 169
+-5 198 -18 201 -9 1 -19 0 -23 -4z"/>
+<path d="M3410 3455 c0 -28 -4 -35 -20 -35 -15 0 -20 -7 -20 -25 0 -18 5 -25
+20 -25 19 0 20 -7 20 -95 0 -131 19 -164 91 -153 37 5 33 43 -4 43 -16 1 -32
+7 -38 15 -5 8 -9 54 -9 103 l0 87 35 0 c31 0 35 3 35 25 0 22 -4 25 -35 25
+-33 0 -35 2 -35 35 0 28 -4 35 -20 35 -16 0 -20 -7 -20 -35z"/>
+<path d="M8750 3455 c0 -28 -4 -35 -20 -35 -15 0 -20 -7 -20 -25 0 -18 5 -25
+19 -25 17 0 19 -10 23 -104 2 -85 6 -108 22 -125 32 -35 114 -23 99 15 -3 8
+-14 12 -27 9 -42 -10 -51 8 -54 110 l-4 95 41 0 c37 0 41 2 41 25 0 23 -4 25
+-40 25 -39 0 -40 1 -40 35 0 28 -4 35 -20 35 -16 0 -20 -7 -20 -35z"/>
+<path d="M2453 3405 c-34 -15 -38 -21 -25 -43 7 -10 14 -10 38 3 16 8 36 15
+45 15 25 0 57 -31 65 -62 6 -28 6 -28 -44 -28 -64 0 -98 -15 -112 -51 -15 -34
+2 -94 30 -109 28 -15 86 -12 100 5 7 8 16 15 21 15 5 0 9 -7 9 -15 0 -9 9 -15
+21 -15 21 0 21 3 17 118 -3 76 -9 125 -18 139 -27 43 -87 54 -147 28z m125
+-171 c4 -31 -34 -74 -68 -74 -48 0 -74 39 -47 72 16 21 35 27 77 25 27 -2 36
+-7 38 -23z"/>
+<path d="M2700 3281 c0 -78 0 -144 0 -148 -1 -5 8 -9 19 -11 18 -3 19 4 20 95
+1 106 16 145 60 151 15 2 21 10 21 28 0 30 -27 32 -58 4 -26 -24 -30 -25 -28
+-3 0 10 -7 19 -16 21 -17 3 -18 -9 -18 -137z"/>
+<path d="M3184 3410 c-79 -32 -97 -179 -31 -256 29 -34 100 -44 145 -20 34 17
+37 23 23 44 -6 11 -15 10 -43 -4 -48 -22 -87 -9 -111 37 l-17 34 97 5 98 5 -3
+39 c-8 95 -80 148 -158 116z m91 -55 c14 -13 25 -33 25 -45 0 -18 -6 -20 -70
+-20 -64 0 -70 2 -70 20 0 27 43 70 70 70 12 0 32 -11 45 -25z"/>
+<path d="M3754 3404 c-45 -22 -64 -62 -64 -136 0 -96 42 -147 122 -148 92 -1
+146 122 99 227 -30 66 -93 89 -157 57z m86 -39 c64 -33 63 -157 -1 -190 -58
+-31 -109 15 -109 97 0 41 5 54 29 79 34 33 41 35 81 14z"/>
+<path d="M4740 3407 c-43 -22 -70 -74 -70 -134 0 -93 49 -153 124 -153 44 0
+86 22 86 45 0 23 -16 26 -48 9 -50 -24 -100 -2 -116 54 -7 22 -6 22 88 22 l96
+0 0 36 c0 98 -82 160 -160 121z m103 -59 c9 -11 17 -29 17 -39 0 -17 -8 -19
+-75 -19 -87 0 -95 11 -45 62 25 24 36 29 58 24 15 -4 35 -16 45 -28z"/>
+<path d="M5260 3270 c0 -143 1 -150 20 -150 19 0 20 7 20 150 0 143 -1 150
+-20 150 -19 0 -20 -7 -20 -150z"/>
+<path d="M5431 3407 c-104 -53 -86 -262 24 -283 45 -8 80 1 105 28 17 19 18
+24 6 36 -12 12 -18 11 -44 -8 -20 -15 -37 -20 -51 -15 -84 26 -91 172 -10 206
+27 10 34 9 60 -10 23 -17 33 -20 44 -11 19 16 8 38 -26 55 -34 18 -76 19 -108
+2z"/>
+<path d="M5652 3405 c-29 -13 -32 -17 -22 -35 12 -23 21 -25 37 -9 6 6 28 11
+48 12 41 1 65 -21 65 -60 0 -21 -4 -23 -55 -23 -46 0 -60 -4 -80 -25 -53 -52
+-18 -145 54 -145 20 0 47 7 59 16 20 14 22 14 22 0 0 -9 9 -16 20 -16 19 0 20
+7 20 121 0 120 0 121 -29 150 -34 33 -83 38 -139 14z m126 -177 c6 -51 -71
+-91 -106 -56 -36 36 7 91 68 86 30 -3 35 -7 38 -30z"/>
+<path d="M6422 3296 c3 -116 5 -126 27 -150 28 -30 85 -35 117 -11 25 19 34
+19 34 0 0 -8 9 -15 20 -15 19 0 20 7 20 150 0 140 -1 150 -19 150 -17 0 -19
+-10 -23 -98 -4 -120 -20 -152 -73 -152 -54 0 -65 26 -65 147 0 98 -1 103 -21
+103 -20 0 -21 -4 -17 -124z"/>
+<path d="M6720 3215 c0 -198 1 -205 20 -205 18 0 20 7 20 70 0 39 3 70 8 70 4
+0 16 -7 26 -15 47 -36 125 -4 152 61 56 133 -61 281 -160 203 l-26 -20 0 20
+c0 14 -6 21 -20 21 -19 0 -20 -7 -20 -205z m160 145 c24 -13 43 -73 36 -114
+-9 -47 -40 -76 -81 -76 -47 0 -75 37 -75 100 0 81 57 124 120 90z"/>
+<path d="M7020 3215 c0 -198 1 -205 20 -205 18 0 20 7 20 71 l0 71 25 -16 c81
+-53 175 21 175 138 0 114 -98 185 -174 125 l-26 -20 0 20 c0 14 -6 21 -20 21
+-19 0 -20 -7 -20 -205z m150 150 c53 -27 64 -131 19 -176 -25 -25 -80 -25
+-104 1 -23 25 -30 107 -13 140 7 13 25 30 38 37 31 16 26 16 60 -2z"/>
+<path d="M7463 3386 c-33 -30 -37 -39 -41 -95 -8 -104 40 -171 122 -171 44 0
+86 22 86 45 0 23 -16 26 -48 9 -38 -19 -76 -10 -102 23 -37 47 -29 53 75 53
+l95 0 0 30 c0 74 -55 140 -116 140 -25 0 -44 -9 -71 -34z m100 -18 c28 -15 46
+-38 47 -60 0 -16 -10 -18 -75 -18 -86 0 -95 11 -46 61 33 32 42 34 74 17z"/>
+<path d="M7710 3270 c0 -143 1 -150 20 -150 19 0 20 7 20 95 0 121 14 155 65
+155 54 0 65 -26 65 -147 0 -95 2 -103 19 -103 17 0 19 10 23 104 3 116 18 146
+69 146 51 0 59 -20 59 -141 l0 -109 26 0 27 0 -7 116 c-9 152 -25 184 -92 184
+-31 0 -84 -27 -84 -42 0 -7 -13 0 -28 15 -32 31 -69 34 -112 12 -27 -14 -30
+-14 -30 0 0 8 -9 15 -20 15 -19 0 -20 -7 -20 -150z"/>
+<path d="M8211 3404 c-30 -21 -61 -89 -61 -134 0 -45 31 -113 61 -134 35 -24
+102 -21 133 7 38 33 22 52 -27 32 -50 -21 -99 -2 -115 44 -6 17 -8 31 -4 32 4
+0 48 1 97 2 l90 2 -3 39 c-4 48 -24 89 -54 110 -29 21 -87 20 -117 0z m83 -34
+c25 -9 60 -62 49 -74 -8 -8 -138 -8 -146 0 -9 9 20 61 40 73 23 13 26 13 57 1z"/>
+<path d="M8440 3270 c0 -140 1 -150 19 -150 16 0 19 12 25 103 9 120 21 147
+70 147 56 0 66 -21 66 -143 l0 -107 25 0 c25 0 25 0 25 94 0 117 -6 149 -36
+181 -27 29 -88 34 -120 10 -25 -19 -34 -19 -34 0 0 8 -9 15 -20 15 -19 0 -20
+-7 -20 -150z"/>
+<path d="M8935 3395 c-18 -17 -25 -35 -25 -64 0 -47 29 -76 90 -86 21 -4 44
+-13 50 -20 17 -21 2 -54 -27 -62 -24 -5 -38 -2 -94 21 -22 9 -32 -29 -13 -45
+21 -17 100 -23 133 -10 29 13 51 47 51 80 0 29 -38 69 -73 76 -71 15 -101 61
+-56 85 19 11 40 9 90 -6 11 -3 18 3 22 16 12 45 -107 57 -148 15z"/>
+<path d="M9650 3270 c0 -143 1 -150 20 -150 17 0 20 7 20 48 2 106 10 156 32
+179 12 13 30 23 40 23 13 0 18 7 18 25 0 32 -27 33 -64 4 l-26 -20 0 20 c0 14
+-6 21 -20 21 -19 0 -20 -7 -20 -150z"/>
+<path d="M9848 3404 c-30 -16 -32 -22 -20 -42 7 -10 16 -9 45 3 42 17 79 8 97
+-25 19 -35 6 -50 -44 -50 -62 0 -95 -17 -105 -54 -9 -37 3 -86 26 -103 23 -18
+84 -16 111 3 20 14 22 14 22 0 0 -9 9 -16 20 -16 19 0 20 7 20 105 0 114 -14
+166 -48 184 -29 15 -92 13 -124 -5z m110 -150 c28 -8 28 -33 1 -68 -13 -17
+-30 -26 -48 -26 -35 0 -51 17 -51 52 0 39 42 57 98 42z"/>
+<path d="M10132 3404 c-96 -67 -58 -284 50 -284 19 0 43 7 54 15 10 8 22 15
+27 15 4 0 7 -31 7 -70 0 -63 2 -70 20 -70 19 0 20 7 20 205 0 198 -1 205 -20
+205 -11 0 -20 -7 -20 -15 0 -14 -3 -14 -30 0 -37 19 -80 19 -108 -1z m117 -60
+c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
+-7 54 -26z"/>
+</g>
+</svg>
+        <span class="font-display font-extrabold text-xl md:text-2xl text-teal-800 leading-none">
+          <span lang="en" class="ltr-only">Tibaba</span><span class="text-teal-500 mx-1">·</span><span lang="ar" dir="rtl" class="font-display">طبابة</span>
+        </span>
+      </a>
+
+      <!-- Desktop search -->
+      <form id="searchFormDesktop" role="search" class="hidden md:flex flex-1 max-w-xl">
+        <div class="relative w-full">
+          <input id="searchInputDesktop" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="Search medicines, devices, vitamins…"
+                 class="w-full h-11 rounded-full border border-teal-900/15 bg-sand-50 ps-11 pe-4 text-sm focus:bg-white focus:border-teal-600 outline-none transition-colors">
+          <svg class="w-4.5 h-4.5 absolute top-1/2 -translate-y-1/2 start-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+      </form>
+
+      <div class="ms-auto flex items-center gap-1 md:gap-2">
+        <button id="searchOpenBtnMobile" type="button" class="md:hidden p-2 text-ink-900" aria-label="Search" aria-controls="searchOverlay" aria-expanded="false">
+          <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+
+        <button type="button" id="sellHeaderBtn" class="hidden sm:inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-teal-700 text-teal-800 font-display font-semibold text-sm hover:bg-teal-50 transition-colors">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="sellWithUs">Sell with us</span>
+        </button>
+
+        <button type="button" id="cartBtn" class="relative p-2 text-ink-900" aria-label="Cart">
+          <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
+          <span id="cartCount" class="absolute -top-0.5 -end-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-cyan-500 text-white text-[10px] font-bold flex items-center justify-center nums">0</span>
+        </button>
+
+        <button id="langToggleHeader" type="button" class="inline-flex items-center justify-center h-10 w-10 rounded-full border border-teal-900/15 text-sm font-display font-bold text-teal-800 hover:bg-teal-50 transition-colors" aria-label="Switch language">
+          <span id="langToggleHeaderLabel">AR</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= [CATSTRIP] ============================= -->
+  <nav class="hidden md:block border-t border-teal-900/10 bg-white" aria-label="Categories">
+    <div class="max-w-7xl mx-auto px-4">
+      <ul id="catStrip" class="flex items-center gap-7 h-12 text-sm font-medium text-ink-900/80"></ul>
+    </div>
+  </nav>
+</header>
+
+<!-- ============================= [SEARCHOVERLAY] ============================= -->
+<div id="searchOverlay" class="md:hidden hidden border-b border-teal-900/10 bg-white px-4 py-3">
+  <form id="searchFormMobile" role="search" class="relative">
+    <input id="searchInputMobile" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="Search medicines, devices, vitamins…"
+           class="w-full h-11 rounded-full border border-teal-900/15 bg-sand-50 ps-11 pe-4 text-sm focus:bg-white focus:border-teal-600 outline-none">
+    <svg class="w-4.5 h-4.5 absolute top-1/2 -translate-y-1/2 start-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+  </form>
+</div>
+
+<!-- ============================= [DRAWER] backdrop + panel ============================= -->
+<div id="drawerBackdrop" class="hidden fixed inset-0 bg-ink-900/40 z-[60]"></div>
+<aside id="catDrawer" class="hidden fixed top-0 bottom-0 start-0 w-[88%] max-w-sm bg-white z-[70] flex flex-col" aria-label="Categories" role="dialog" aria-modal="true">
+  <div class="h-16 flex items-center justify-between px-4 border-b border-teal-900/10 shrink-0">
+    <span class="font-display font-bold text-lg text-teal-800" data-i18n="categories">Categories</span>
+    <button id="drawerCloseBtn" type="button" class="p-2 -me-2" aria-label="Close">
+      <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div id="drawerList" class="flex-1 overflow-y-auto px-2 py-2"></div>
+  <div class="p-4 border-t border-teal-900/10 shrink-0">
+    <button type="button" id="drawerSellBtn" class="w-full h-11 rounded-full bg-teal-700 text-white font-display font-semibold text-sm" data-i18n="submitProduct">Submit a Product</button>
+  </div>
+</aside>
+
+<!-- ============================= [CARTDRAWER] ============================= -->
+<div id="cartDrawerBackdrop" class="hidden fixed inset-0 bg-ink-900/40 z-[60]"></div>
+<aside id="cartDrawer" class="hidden fixed top-0 bottom-0 end-0 w-[88%] max-w-sm bg-white z-[70] flex flex-col" aria-label="Cart" role="dialog" aria-modal="true">
+  <div class="h-16 flex items-center justify-between px-4 border-b border-teal-900/10 shrink-0">
+    <span class="font-display font-bold text-lg text-teal-800" data-i18n="cartTitle">Your cart</span>
+    <button id="cartCloseBtn" type="button" class="p-2 -me-2" aria-label="Close">
+      <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div id="cartList" class="flex-1 overflow-y-auto px-4 py-2"></div>
+  <div id="cartFooter" class="p-4 border-t border-teal-900/10 shrink-0 space-y-3">
+    <div class="flex items-center justify-between text-sm">
+      <span class="text-slate-500" data-i18n="cartSubtotal">Subtotal</span>
+      <span id="cartSubtotal" class="font-mono font-semibold text-teal-800 nums">0 IQD</span>
+    </div>
+    <button type="button" id="cartWhatsappBtn" class="w-full h-11 rounded-full bg-teal-700 text-white font-display font-semibold text-sm flex items-center justify-center gap-2">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 1 1-4.1-7.3L21 5l-1 4.5"/></svg>
+      <span data-i18n="cartOrderWhatsapp">Order via WhatsApp</span>
+    </button>
+  </div>
+</aside>
+
+<main id="main">
+  <!-- ============================= [SHOPBYCAT] ============================= -->
+  <section id="shop-by-category" class="max-w-7xl mx-auto px-4 pt-10 pb-12 md:pt-14 md:pb-16">
+    <div class="flex items-end justify-between mb-6">
+      <h2 class="font-display font-extrabold text-2xl md:text-3xl text-ink-900" data-i18n="shopByCategory">Shop by category</h2>
+    </div>
+    <div id="categoryGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 md:gap-4"></div>
+  </section>
+
+  <!-- ============================= [PRODUCTS] ============================= -->
+  <section class="max-w-7xl mx-auto px-4 py-4 md:py-8">
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <h2 class="font-display font-extrabold text-2xl md:text-3xl text-ink-900" data-i18n="featuredProducts">Featured products</h2>
+      <div id="productTabs" class="flex items-center gap-2 overflow-x-auto no-scrollbar"></div>
+    </div>
+    <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5"></div>
+  </section>
+
+  <!-- ============================= [SELLCTA] ============================= -->
+  <section class="max-w-7xl mx-auto px-4 py-10">
+    <div class="relative overflow-hidden rounded-3xl bg-teal-800 px-6 py-10 md:px-12 md:py-14 grid md:grid-cols-[1fr_auto] items-center gap-8">
+      <svg viewBox="0 0 1200 60" preserveAspectRatio="none" class="absolute top-0 left-0 w-full h-8 opacity-40 rotate-180" aria-hidden="true">
+        <path d="M0 30 H420 L450 8 L478 52 L505 30 H560 L588 12 L612 46 L640 30 H1200" fill="none" stroke="#22B8CE" stroke-width="2"/>
+      </svg>
+      <div class="relative z-10">
+        <h2 class="font-display font-extrabold text-2xl md:text-3xl text-white" data-i18n="sellCtaTitle">Have medical products to sell?</h2>
+        <p class="mt-2 text-teal-100/80 max-w-lg" data-i18n="sellCtaSub">List a product in minutes — no account needed. Our team reviews every listing and reaches out on WhatsApp.</p>
+        <p class="mt-3 text-cyan-400 text-sm font-display font-semibold" data-i18n="sellCtaNote">Free to list · Reviewed within 24 hours</p>
+      </div>
+      <button type="button" id="sellCtaBtn" class="relative z-10 h-12 px-7 rounded-full bg-cyan-500 hover:bg-cyan-400 transition-colors text-teal-950 font-display font-bold text-sm whitespace-nowrap" data-i18n="submitProduct">Submit a Product</button>
+    </div>
+  </section>
+
+  <!-- ============================= [WHY] ============================= -->
+  <section class="max-w-7xl mx-auto px-4 py-12 md:py-16">
+    <h2 class="font-display font-extrabold text-2xl md:text-3xl text-ink-900 mb-8" data-i18n="whyTitle">Why people trust Tibaba</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div class="rounded-2xl border border-teal-900/10 bg-white p-5">
+        <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-4"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3 class="font-display font-bold text-ink-900" data-i18n="why1Title">Verified pharmacies &amp; sellers</h3>
+        <p class="mt-1 text-sm text-slate-500" data-i18n="why1Sub">Every seller is reviewed before going live on the marketplace.</p>
+      </div>
+      <div class="rounded-2xl border border-teal-900/10 bg-white p-5">
+        <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-4"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></div>
+        <h3 class="font-display font-bold text-ink-900" data-i18n="why2Title">Genuine products only</h3>
+        <p class="mt-1 text-sm text-slate-500" data-i18n="why2Sub">Listings are checked against product details before approval.</p>
+      </div>
+      <div class="rounded-2xl border border-teal-900/10 bg-white p-5">
+        <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-4"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3zM14 11h4l3 3v3h-7z"/><circle cx="7.5" cy="18.5" r="1.5"/><circle cx="17.5" cy="18.5" r="1.5"/></svg></div>
+        <h3 class="font-display font-bold text-ink-900" data-i18n="why3Title">Delivery across Iraq</h3>
+        <p class="mt-1 text-sm text-slate-500" data-i18n="why3Sub">From Basra to Duhok, with cash on delivery available.</p>
+      </div>
+      <div class="rounded-2xl border border-teal-900/10 bg-white p-5">
+        <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-4"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 1 1-4.1-7.3L21 5l-1 4.5"/></svg></div>
+        <h3 class="font-display font-bold text-ink-900" data-i18n="why4Title">Easy support</h3>
+        <p class="mt-1 text-sm text-slate-500" data-i18n="why4Sub">Reach a real person on WhatsApp for any order question.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= [INSTALLAPP] ============================= -->
+  <section class="max-w-7xl mx-auto px-4 pb-14">
+    <div class="rounded-3xl bg-sand-50 border border-teal-900/10 p-6 md:p-10 grid md:grid-cols-[auto_1fr_auto] items-center gap-6">
+      <div class="w-14 h-14 rounded-2xl bg-teal-800 text-white flex items-center justify-center shrink-0">
+        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
+      </div>
+      <div>
+        <h3 class="font-display font-bold text-lg text-ink-900" data-i18n="installTitle">Install the Tibaba app</h3>
+        <p class="text-sm text-slate-500 mt-1" id="installHintIOS" data-i18n="installHintIOS">On iPhone: tap Share, then “Add to Home Screen”.</p>
+      </div>
+      <button type="button" id="pwaInstallBtn" class="hidden h-11 px-6 rounded-full bg-teal-700 text-white font-display font-semibold text-sm whitespace-nowrap" data-i18n="installCta">Install app</button>
+    </div>
+  </section>
+</main>
+
+<!-- ============================= [FOOTER] ============================= -->
+<footer class="bg-teal-950 text-teal-100/80">
+  <div class="max-w-7xl mx-auto px-4 pt-14 pb-8">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-10">
+      <div class="lg:col-span-2">
+        <div class="flex items-center gap-2.5 mb-4">
+          <span class="inline-flex items-center justify-center bg-white rounded-xl p-1.5">
+            <svg class="h-7 w-auto block" version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="1196.000000pt" height="1504.000000pt" viewBox="0 0 1196.000000 1504.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,1504.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M8220 12244 c-64 -37 -89 -62 -116 -119 -42 -88 -25 -205 41 -283 35
+-40 36 -44 33 -109 l-3 -68 -55 -12 c-30 -6 -75 -17 -100 -23 -25 -7 -52 -13
+-60 -14 -8 -1 -22 -5 -30 -8 -8 -3 -33 -11 -55 -18 -149 -47 -262 -134 -346
+-265 -63 -98 -78 -133 -81 -195 l-3 -55 70 -7 c89 -9 184 10 283 57 57 27 97
+57 183 140 105 102 166 142 195 131 11 -4 14 -55 14 -278 1 -219 12 -430 30
+-535 2 -15 197 73 233 104 15 15 17 40 17 252 0 130 3 293 7 364 l6 127 57 0
+c193 0 369 -102 413 -240 27 -83 22 -170 -13 -246 -62 -134 -169 -212 -526
+-382 -296 -141 -383 -193 -473 -284 -80 -80 -117 -138 -143 -223 -20 -65 -21
+-77 -10 -165 21 -161 98 -278 231 -349 81 -43 96 -41 109 12 17 69 -1 144 -58
+232 -39 61 -50 92 -50 143 1 156 159 280 575 453 246 102 404 196 488 289 120
+133 167 250 167 412 0 57 -6 126 -14 153 -43 163 -174 303 -351 378 -130 55
+-145 59 -263 64 -129 6 -132 9 -132 101 0 36 6 52 26 73 52 54 65 203 26 279
+-51 97 -117 139 -217 140 -46 0 -70 -6 -105 -26z m-470 -878 c0 -27 -42 -66
+-71 -66 -28 0 -23 27 10 61 36 36 61 38 61 5z"/>
+<path d="M5745 10474 c-33 -14 -115 -48 -183 -77 l-123 -51 3 -1056 c4 -1113
+2 -1077 50 -1240 40 -138 147 -270 281 -344 34 -19 105 -47 157 -61 89 -23
+110 -25 330 -25 263 0 337 12 460 72 62 30 173 129 228 201 l21 29 88 -89 c98
+-98 186 -151 307 -187 70 -21 88 -21 1161 -24 1068 -2 1092 -2 1190 18 113 24
+109 22 230 81 72 35 106 60 176 129 87 85 108 118 161 240 44 103 61 199 61
+345 -1 387 -177 662 -513 802 -135 56 -322 79 -475 58 -63 -8 -267 -64 -280
+-76 -5 -5 -15 -9 -22 -9 -22 0 -156 -70 -293 -153 -78 -47 -127 -85 -243 -190
+-48 -44 -90 -77 -93 -75 -2 3 -1 122 4 264 5 143 6 262 3 266 -3 4 -48 -13
+-98 -38 l-93 -44 0 -327 c0 -318 -1 -326 -22 -362 -12 -20 -60 -94 -107 -166
+-46 -71 -100 -159 -119 -195 -20 -36 -53 -91 -74 -122 l-39 -58 -207 0 c-180
+0 -215 3 -272 21 -159 50 -234 135 -267 304 -10 52 -13 185 -13 516 l0 447
+-107 -45 c-60 -25 -142 -60 -183 -77 -41 -17 -81 -35 -87 -39 -10 -6 -13 -104
+-13 -433 l0 -425 -31 -75 c-38 -92 -89 -140 -182 -172 -57 -19 -85 -22 -234
+-22 -145 0 -177 3 -228 21 -104 36 -180 132 -207 264 -10 46 -13 308 -13 1133
+0 946 -2 1072 -15 1072 -8 -1 -42 -12 -75 -26z m3875 -1584 c122 -41 227 -127
+278 -226 43 -84 54 -148 50 -282 -3 -105 -7 -136 -26 -177 -27 -58 -82 -119
+-132 -145 -95 -49 -116 -50 -846 -50 -756 0 -703 -5 -664 64 50 89 202 301
+280 388 56 65 263 246 336 295 103 70 235 125 359 149 102 20 282 12 365 -16z"/>
+<path d="M2488 10296 c-81 -48 -115 -94 -130 -176 -14 -84 3 -139 63 -201 110
+-114 295 -85 360 56 13 28 19 63 19 116 0 67 -3 81 -29 119 -15 23 -50 57 -77
+76 -43 29 -57 33 -109 33 -43 -1 -70 -7 -97 -23z"/>
+<path d="M3050 10290 c-140 -92 -162 -253 -51 -370 36 -38 59 -52 104 -65 53
+-15 61 -15 112 0 111 32 183 136 171 247 -9 88 -67 170 -145 204 -18 7 -59 14
+-90 14 -45 0 -64 -6 -101 -30z"/>
+<path d="M8533 10224 c-3 -9 -3 -47 0 -85 6 -69 7 -71 65 -134 84 -89 90 -144
+28 -248 -36 -63 -56 -77 -246 -182 -223 -124 -268 -154 -330 -222 -163 -178
+-166 -345 -10 -532 28 -33 60 -66 72 -72 16 -9 12 0 -15 31 -49 58 -77 135
+-77 213 0 51 7 76 35 135 60 125 143 188 402 306 217 99 280 145 345 255 93
+157 73 312 -57 446 -56 58 -110 89 -168 98 -29 4 -39 2 -44 -9z"/>
+<path d="M8340 10174 c-134 -72 -123 -39 -119 -332 3 -162 8 -251 14 -250 6 2
+52 25 103 52 71 37 94 54 100 75 11 40 8 494 -3 498 -6 1 -48 -18 -95 -43z"/>
+<path d="M3445 9655 c-93 -40 -176 -78 -182 -84 -8 -7 -13 -37 -13 -74 0 -36
+-5 -68 -12 -75 -8 -8 -46 -12 -104 -12 -172 0 -395 -50 -537 -121 -31 -16 -62
+-29 -67 -29 -22 0 -170 -97 -249 -164 -98 -82 -155 -156 -211 -271 -56 -114
+-73 -201 -67 -355 3 -108 8 -138 36 -220 54 -158 110 -234 236 -318 164 -109
+283 -145 470 -144 147 1 227 21 330 83 53 32 129 109 170 172 19 29 35 35 35
+13 0 -21 39 -105 75 -161 86 -136 220 -216 445 -264 83 -18 585 -10 665 11
+122 31 232 87 304 152 47 43 118 155 142 223 11 31 28 108 39 171 18 104 20
+161 20 613 0 275 -4 499 -8 499 -4 0 -12 -4 -17 -8 -6 -5 -57 -28 -115 -51
+-58 -24 -135 -57 -172 -73 l-67 -31 -3 -436 c-4 -430 -4 -437 -27 -496 -28
+-72 -109 -157 -168 -176 -24 -8 -120 -14 -261 -16 -206 -4 -227 -3 -285 17
+-34 11 -73 31 -88 43 -45 40 -89 115 -100 169 -5 29 -13 67 -16 83 -5 24 -14
+1010 -13 1338 0 37 -3 67 -7 66 -5 0 -84 -34 -178 -74z m-190 -692 c4 -54 5
+-199 3 -324 -5 -215 -6 -229 -29 -270 -27 -48 -99 -107 -174 -142 -83 -39
+-152 -50 -271 -45 -98 4 -116 8 -179 38 -111 53 -151 87 -202 170 -26 41 -28
+53 -27 145 0 86 4 108 26 157 28 61 35 71 84 121 65 67 95 87 219 146 163 78
+250 98 422 100 l121 1 7 -97z"/>
+<path d="M4483 7317 c-92 -34 -163 -130 -163 -220 0 -55 48 -154 95 -196 89
+-78 239 -65 315 27 59 72 77 189 41 267 -23 50 -85 109 -130 124 -43 14 -116
+13 -158 -2z"/>
+<path d="M6795 7311 c-101 -46 -149 -123 -143 -231 7 -131 97 -221 228 -228
+52 -3 75 0 106 16 83 42 133 118 141 213 9 97 -42 180 -144 233 -43 22 -137
+21 -188 -3z"/>
+<path d="M2000 6260 l0 -110 233 -2 232 -3 5 -605 5 -605 130 0 130 0 3 608 2
+607 240 0 240 0 0 110 0 110 -610 0 -610 0 0 -110z"/>
+<path d="M3480 5660 c0 -390 0 -713 0 -717 0 -5 56 -9 125 -11 l125 -3 0 721
+0 720 -125 0 -125 0 0 -710z"/>
+<path d="M4152 5653 l3 -718 460 0 c418 0 465 2 520 18 142 44 224 107 272
+211 25 54 28 72 28 161 -1 91 -4 106 -32 167 -35 74 -91 134 -152 163 -22 11
+-41 23 -41 26 0 3 20 26 44 51 24 25 56 72 72 104 26 53 29 69 29 159 0 90 -3
+105 -28 153 -37 70 -94 123 -172 161 -119 58 -150 61 -598 61 l-407 0 2 -717z
+m833 475 c94 -51 131 -165 82 -253 -16 -30 -37 -48 -82 -70 l-60 -30 -250 0
+-250 0 -3 175 c-1 96 0 181 3 188 8 22 518 13 560 -10z m59 -598 c71 -37 108
+-87 114 -155 6 -68 -9 -104 -59 -149 -60 -55 -108 -64 -382 -72 -134 -4 -256
+-4 -271 0 l-26 6 0 194 c0 146 3 196 13 200 6 3 136 4 287 3 272 -2 276 -2
+324 -27z"/>
+<path d="M6186 6343 c-7 -16 -91 -201 -186 -413 -94 -212 -201 -448 -237 -525
+-112 -237 -211 -464 -205 -469 3 -4 65 -6 137 -6 94 0 135 4 142 13 8 10 33
+65 128 283 8 19 22 33 37 36 38 7 610 9 651 2 l39 -6 74 -156 c41 -86 80 -160
+87 -164 7 -4 72 -8 145 -8 99 0 132 3 132 13 0 6 -23 59 -51 117 -55 113 -289
+621 -399 865 -37 83 -93 203 -124 269 -31 65 -60 131 -63 147 l-5 29 -144 0
+-143 0 -15 -27z m178 -325 c158 -355 226 -522 217 -531 -13 -13 -313 -22 -415
+-12 -78 7 -78 7 -73 33 2 15 18 59 35 97 85 193 166 385 179 423 9 23 20 42
+25 42 5 0 20 -24 32 -52z"/>
+<path d="M7357 6363 c-4 -3 -7 -328 -7 -720 l0 -714 453 3 c432 4 455 5 525
+26 190 58 273 140 302 300 12 67 1 167 -25 229 -28 66 -86 133 -142 165 l-55
+31 49 42 c27 24 62 67 78 96 28 51 30 61 30 164 0 100 -2 115 -28 167 -33 68
+-90 120 -172 159 -120 57 -142 59 -590 59 -227 0 -415 -3 -418 -7z m840 -240
+c140 -75 131 -273 -15 -330 -41 -16 -79 -18 -302 -18 l-255 0 -3 175 c-1 96 0
+180 3 188 4 11 53 13 267 10 249 -3 265 -4 305 -25z m48 -594 c161 -83 147
+-297 -23 -353 -40 -14 -92 -16 -323 -14 l-274 3 -3 175 c-1 96 0 185 3 198 l6
+23 282 -3 c280 -3 283 -3 332 -29z"/>
+<path d="M9402 6348 c-6 -13 -27 -57 -46 -98 -18 -41 -64 -140 -101 -220 -37
+-80 -109 -237 -160 -350 -51 -113 -145 -318 -208 -457 -64 -139 -118 -261
+-122 -273 -6 -19 -3 -20 134 -20 l141 0 38 83 c21 45 53 119 71 164 31 73 37
+82 65 87 46 8 678 -2 687 -11 4 -4 39 -75 77 -157 39 -82 77 -153 84 -157 7
+-5 73 -9 146 -9 105 0 132 3 132 14 0 7 -27 71 -61 142 -34 71 -149 318 -256
+549 -107 231 -221 478 -254 548 -33 70 -62 141 -66 158 l-5 29 -143 0 c-137 0
+-142 -1 -153 -22z m167 -320 c10 -24 33 -77 51 -118 18 -41 63 -145 100 -230
+38 -85 70 -161 72 -169 2 -9 -13 -19 -42 -28 -35 -11 -92 -13 -248 -10 -111 2
+-205 7 -209 10 -7 7 0 25 120 307 113 264 120 280 129 280 4 0 16 -19 27 -42z"/>
+<path d="M3900 4150 l0 -340 30 0 30 0 0 340 0 340 -30 0 -30 0 0 -340z"/>
+<path d="M3395 4462 c-3 -3 -5 -94 -5 -203 0 -108 -3 -204 -6 -213 -5 -13 -24
+-16 -101 -16 l-96 0 27 21 c57 45 74 133 36 182 -39 49 -155 59 -249 21 -37
+-14 -41 -20 -41 -50 0 -27 11 -46 50 -89 28 -30 50 -61 50 -69 0 -23 -163 -36
+-201 -16 -17 10 -19 22 -19 125 l0 115 -41 0 -41 0 4 -181 c3 -169 2 -181 -16
+-195 -11 -8 -32 -14 -48 -14 -25 0 -28 -3 -28 -34 0 -43 10 -49 61 -41 60 10
+100 50 106 105 l5 45 112 0 c68 0 119 5 132 12 16 9 30 9 65 -3 32 -12 74 -15
+157 -12 161 5 152 -12 152 283 l0 234 -30 -1 c-16 -1 -32 -3 -35 -6z m-227
+-268 c31 -22 29 -66 -7 -106 l-28 -32 -17 32 c-9 17 -30 48 -47 67 -22 25 -27
+36 -17 39 7 2 20 7 28 9 30 10 66 7 88 -9z"/>
+<path d="M3560 4210 l0 -261 38 3 37 3 0 255 0 255 -37 3 -38 3 0 -261z"/>
+<path d="M5100 4276 c0 -107 -4 -206 -10 -220 -9 -23 -15 -26 -63 -26 -29 0
+-58 5 -65 12 -8 8 -12 49 -12 121 l0 108 -37 -3 -38 -3 -5 -115 -5 -115 -70 0
+-70 0 -3 118 -3 117 -39 0 -40 0 0 -115 c0 -128 -4 -135 -75 -135 -73 0 -75 4
+-75 155 l0 135 -35 0 c-23 0 -35 -5 -35 -14 0 -9 -20 -15 -66 -20 -37 -4 -75
+-11 -86 -17 -74 -40 -77 -206 -4 -254 34 -22 98 -30 125 -16 19 10 25 9 41
+-11 17 -21 25 -23 128 -23 76 0 114 4 125 13 14 12 20 11 39 -2 29 -21 139
+-21 178 -1 25 13 32 13 57 0 40 -21 448 -22 498 -1 30 13 38 13 62 1 36 -19
+104 -19 148 -1 44 19 47 41 43 301 l-3 200 -37 3 -38 3 0 -219 c0 -240 2 -232
+-59 -232 -45 0 -58 19 -65 94 -4 38 -14 82 -24 98 -38 65 -161 82 -252 35 -29
+-15 -53 -27 -53 -27 -1 0 -2 55 -2 122 l0 123 -37 3 -38 3 0 -195z m-687 -130
+c-1 -37 -7 -64 -17 -74 -18 -19 -69 -20 -90 -2 -17 13 -22 86 -8 106 14 21 47
+34 82 31 l35 -2 -2 -59z m961 50 c40 -17 58 -57 54 -122 l-3 -49 -125 0 -125
+0 -3 48 c-3 44 0 51 31 81 54 51 115 66 171 42z"/>
+<path d="M5810 4210 l0 -260 35 0 35 0 0 260 0 260 -35 0 -35 0 0 -260z"/>
+<path d="M6998 4253 l-3 -218 -52 -3 -53 -3 0 171 0 171 -37 -3 -38 -3 -3
+-167 -2 -168 -60 0 -60 0 0 -40 0 -40 155 0 c120 0 163 4 185 15 27 14 32 14
+55 -1 32 -21 107 -14 135 11 19 17 21 17 41 -1 31 -28 158 -27 189 1 15 13 23
+16 28 8 15 -24 67 -33 188 -33 91 0 133 4 154 15 25 13 32 13 57 0 38 -20 71
+-19 117 5 39 19 39 19 64 0 34 -27 140 -28 173 -1 22 18 23 18 56 -2 27 -15
+47 -18 103 -15 109 6 105 -5 105 276 l0 237 -37 3 -38 3 -2 -218 -3 -218 -48
+-3 c-66 -4 -77 8 -77 80 0 81 -21 122 -77 149 -33 16 -54 20 -85 15 -92 -15
+-122 -50 -134 -157 -3 -35 -11 -70 -17 -76 -5 -7 -29 -13 -52 -13 -50 0 -55 8
+-55 81 0 89 -53 149 -132 149 -21 0 -38 2 -38 5 0 3 27 38 60 78 33 41 60 79
+60 85 0 6 -11 19 -26 28 -24 16 -26 16 -38 -2 -8 -10 -46 -59 -85 -108 -56
+-70 -71 -95 -71 -122 l0 -34 78 0 c101 0 114 -12 110 -96 l-3 -59 -124 -3
+c-151 -3 -161 2 -161 86 0 75 -24 120 -74 143 -23 10 -54 19 -71 19 -16 0 -48
+-9 -71 -19 -49 -22 -74 -68 -74 -138 0 -72 -20 -95 -78 -91 l-47 3 -3 218 -2
+217 -40 0 -40 0 -2 -217z m385 -54 c43 -19 61 -93 36 -142 -16 -30 -28 -37
+-66 -37 -73 0 -99 115 -38 167 30 26 35 27 68 12z m804 -13 c24 -21 28 -32 28
+-74 0 -35 -6 -56 -19 -71 -25 -28 -79 -28 -107 0 -18 18 -21 30 -17 77 8 87
+58 117 115 68z"/>
+<path d="M8597 4464 c-4 -4 -7 -121 -7 -261 l0 -253 40 0 40 0 -2 258 -3 257
+-30 3 c-17 2 -34 0 -38 -4z"/>
+<path d="M2550 4205 l0 -255 35 0 35 0 0 255 0 255 -35 0 -35 0 0 -255z"/>
+<path d="M4282 4448 c-17 -17 -15 -55 4 -66 43 -24 88 36 49 65 -23 16 -37 17
+-53 1z"/>
+<path d="M4390 4446 c-21 -26 -8 -61 24 -64 43 -5 61 32 30 62 -19 20 -38 20
+-54 2z"/>
+<path d="M2242 4418 c-30 -30 -2 -86 38 -73 15 5 20 15 20 40 0 41 -32 59 -58
+33z"/>
+<path d="M2340 4415 c-15 -18 -6 -61 15 -69 37 -14 65 26 45 64 -13 24 -42 26
+-60 5z"/>
+<path d="M9156 4414 c-9 -8 -16 -22 -16 -29 0 -15 27 -45 40 -45 15 0 40 31
+40 50 0 11 -9 24 -19 30 -25 13 -27 13 -45 -6z"/>
+<path d="M9262 4418 c-30 -30 -2 -86 38 -73 15 5 20 15 20 40 0 41 -32 59 -58
+33z"/>
+<path d="M6284 4366 c-3 -8 -4 -25 -2 -38 2 -18 10 -24 35 -26 28 -3 33 1 39
+23 4 15 1 31 -6 40 -16 19 -59 19 -66 1z"/>
+<path d="M6389 4359 c-8 -16 -8 -28 0 -45 18 -41 71 -25 71 21 0 44 -50 61
+-71 24z"/>
+<path d="M9532 4260 c-58 -26 -87 -88 -79 -171 8 -96 41 -125 146 -135 39 -4
+71 -10 71 -15 0 -4 -11 -21 -24 -36 -21 -25 -31 -28 -83 -28 -55 0 -58 -1 -61
+-26 -4 -37 20 -52 82 -51 88 1 144 40 153 110 l5 39 79 6 c44 4 88 11 98 17
+14 7 29 6 55 -5 44 -19 83 -19 118 -1 22 12 33 12 72 -1 54 -18 108 -11 137
+18 17 17 19 34 19 144 0 69 0 128 0 133 0 4 -15 8 -35 10 l-35 3 -1 -78 c0
+-43 -3 -96 -7 -118 -7 -38 -9 -40 -46 -43 -24 -2 -42 2 -47 10 -5 7 -9 50 -9
+96 l0 82 -35 0 -35 0 0 -69 c0 -100 -10 -121 -59 -121 -47 0 -51 8 -51 101 l0
+69 -40 0 -39 0 -3 -82 -3 -83 -67 -3 -68 -3 0 78 c0 92 -21 136 -75 159 -46
+19 -81 17 -133 -6z m125 -91 c7 -13 13 -50 13 -81 0 -53 -2 -58 -25 -64 -38
+-9 -93 4 -105 26 -15 27 -12 87 5 120 24 46 88 45 112 -1z"/>
+<path d="M2226 4240 c-77 -68 -68 -223 17 -266 19 -11 54 -17 90 -17 60 1 68
+-7 47 -47 -20 -37 -131 -52 -225 -30 -78 18 -107 95 -70 184 15 35 15 36 -15
+51 -28 14 -30 14 -44 -7 -22 -34 -38 -118 -31 -163 16 -109 75 -144 243 -145
+125 0 166 11 200 55 20 26 22 39 22 177 0 206 -19 238 -137 238 -55 0 -66 -3
+-97 -30z m148 -62 c11 -15 16 -45 16 -90 l0 -68 -44 0 c-62 0 -96 29 -96 81 0
+41 14 78 34 91 24 16 75 8 90 -14z"/>
+<path d="M6558 4153 l-3 -118 -169 -3 c-116 -2 -173 1 -182 9 -10 8 -14 36
+-14 95 l0 84 -35 0 -35 0 0 -104 c0 -96 2 -107 24 -133 l24 -28 180 -3 c196
+-4 254 5 274 41 8 14 13 67 13 147 l0 125 -37 3 -37 3 -3 -118z"/>
+<path d="M9146 4249 c-39 -31 -56 -71 -56 -134 0 -112 44 -157 155 -160 32 -1
+61 -7 62 -12 2 -6 -7 -24 -21 -39 -23 -28 -27 -29 -113 -28 -99 1 -156 16
+-178 47 -19 27 -19 83 0 137 19 53 20 47 -15 65 -28 15 -30 14 -46 -9 -26 -40
+-39 -143 -24 -195 24 -90 90 -121 257 -121 83 0 106 4 143 23 63 31 73 66 68
+227 -7 182 -31 220 -144 220 -47 0 -67 -5 -88 -21z m136 -66 c14 -13 18 -31
+18 -90 l0 -73 -45 0 c-36 0 -52 6 -72 26 -22 22 -25 32 -20 70 2 25 13 54 22
+64 22 24 72 26 97 3z"/>
+<path d="M4885 3880 c-37 -40 18 -105 60 -70 22 18 19 67 -4 80 -27 14 -35 13
+-56 -10z"/>
+<path d="M4597 3883 c-12 -12 -7 -60 8 -73 34 -28 84 30 55 65 -13 15 -51 20
+-63 8z"/>
+<path d="M4707 3883 c-14 -13 -7 -62 11 -71 35 -19 72 21 52 58 -10 19 -49 27
+-63 13z"/>
+<path d="M5261 3536 c-20 -24 -9 -51 19 -51 21 0 25 5 25 30 0 34 -24 45 -44
+21z"/>
+<path d="M2870 3330 c0 -203 1 -210 20 -210 17 0 20 7 20 39 0 36 30 91 50 91
+4 0 27 -29 49 -65 33 -52 46 -65 67 -65 17 0 23 4 18 13 -5 6 -29 45 -55 86
+l-48 74 50 59 c27 32 49 61 49 64 0 2 -11 4 -24 4 -17 0 -39 -19 -81 -70 -31
+-38 -61 -70 -66 -70 -5 0 -9 59 -9 130 0 123 -1 130 -20 130 -19 0 -20 -7 -20
+-210z"/>
+<path d="M4021 3521 c-10 -10 -22 -37 -26 -59 -4 -28 -12 -42 -27 -45 -27 -7
+-20 -41 10 -45 23 -4 24 -4 20 -128 -3 -123 -3 -124 20 -124 22 0 22 2 22 125
+l0 125 30 0 c25 0 30 4 30 25 0 22 -4 25 -36 25 -34 0 -36 1 -29 27 10 40 24
+54 50 47 16 -4 24 0 29 12 14 36 -60 48 -93 15z"/>
+<path d="M5140 3459 l0 -80 -26 20 c-76 59 -174 -14 -174 -129 0 -115 98 -188
+174 -129 l26 20 0 -20 c0 -14 6 -21 20 -21 19 0 20 7 20 210 0 203 -1 210 -20
+210 -18 0 -20 -7 -20 -81z m-26 -109 c29 -28 32 -107 7 -147 -18 -28 -26 -33
+-61 -33 -35 0 -43 4 -60 33 -24 38 -25 75 -5 122 22 55 76 66 119 25z"/>
+<path d="M5900 3330 c0 -203 1 -210 20 -210 19 0 20 7 20 210 0 203 -1 210
+-20 210 -19 0 -20 -7 -20 -210z"/>
+<path d="M7320 3330 c0 -203 1 -210 20 -210 19 0 20 7 20 210 0 203 -1 210
+-20 210 -19 0 -20 -7 -20 -210z"/>
+<path d="M9270 3275 c0 -258 1 -265 20 -265 19 0 20 7 20 265 0 258 -1 265
+-20 265 -19 0 -20 -7 -20 -265z"/>
+<path d="M2010 3321 c0 -193 1 -201 20 -201 18 0 20 8 22 142 l3 142 58 -118
+c35 -72 62 -116 70 -114 6 3 35 55 62 116 28 61 54 111 59 112 4 0 5 -34 1
+-75 -9 -95 2 -205 21 -205 7 0 15 4 19 10 3 5 2 95 -1 200 -5 137 -10 190 -19
+190 -7 0 -41 -61 -75 -135 -35 -74 -67 -135 -70 -135 -4 0 -35 60 -71 133 -93
+193 -99 189 -99 -62z"/>
+<path d="M4270 3320 c0 -193 1 -200 20 -200 19 0 20 7 20 135 0 74 3 135 8
+134 4 0 30 -49 59 -110 29 -60 56 -109 61 -109 5 0 34 53 65 118 l56 117 1
+-142 c0 -136 1 -143 20 -143 19 0 20 7 20 201 0 247 -5 251 -92 64 -33 -71
+-63 -133 -67 -137 -3 -4 -35 56 -70 133 -49 106 -68 139 -82 139 -18 0 -19
+-12 -19 -200z"/>
+<path d="M6164 3486 c-26 -26 -34 -42 -34 -71 0 -67 22 -92 113 -125 69 -26
+89 -55 64 -93 -9 -14 -28 -27 -42 -31 -28 -7 -101 9 -110 24 -10 16 -22 11
+-28 -11 -12 -44 105 -77 177 -49 53 20 74 115 36 163 -12 16 -45 34 -85 47
+-39 13 -69 30 -76 42 -14 27 -4 65 23 79 20 11 86 8 119 -5 11 -5 18 -1 22 14
+4 17 -1 24 -28 36 -19 8 -53 14 -76 14 -33 0 -47 -6 -75 -34z"/>
+<path d="M9527 3514 c-4 -4 -7 -94 -7 -201 l0 -193 25 0 25 0 -2 197 c-3 169
+-5 198 -18 201 -9 1 -19 0 -23 -4z"/>
+<path d="M3410 3455 c0 -28 -4 -35 -20 -35 -15 0 -20 -7 -20 -25 0 -18 5 -25
+20 -25 19 0 20 -7 20 -95 0 -131 19 -164 91 -153 37 5 33 43 -4 43 -16 1 -32
+7 -38 15 -5 8 -9 54 -9 103 l0 87 35 0 c31 0 35 3 35 25 0 22 -4 25 -35 25
+-33 0 -35 2 -35 35 0 28 -4 35 -20 35 -16 0 -20 -7 -20 -35z"/>
+<path d="M8750 3455 c0 -28 -4 -35 -20 -35 -15 0 -20 -7 -20 -25 0 -18 5 -25
+19 -25 17 0 19 -10 23 -104 2 -85 6 -108 22 -125 32 -35 114 -23 99 15 -3 8
+-14 12 -27 9 -42 -10 -51 8 -54 110 l-4 95 41 0 c37 0 41 2 41 25 0 23 -4 25
+-40 25 -39 0 -40 1 -40 35 0 28 -4 35 -20 35 -16 0 -20 -7 -20 -35z"/>
+<path d="M2453 3405 c-34 -15 -38 -21 -25 -43 7 -10 14 -10 38 3 16 8 36 15
+45 15 25 0 57 -31 65 -62 6 -28 6 -28 -44 -28 -64 0 -98 -15 -112 -51 -15 -34
+2 -94 30 -109 28 -15 86 -12 100 5 7 8 16 15 21 15 5 0 9 -7 9 -15 0 -9 9 -15
+21 -15 21 0 21 3 17 118 -3 76 -9 125 -18 139 -27 43 -87 54 -147 28z m125
+-171 c4 -31 -34 -74 -68 -74 -48 0 -74 39 -47 72 16 21 35 27 77 25 27 -2 36
+-7 38 -23z"/>
+<path d="M2700 3281 c0 -78 0 -144 0 -148 -1 -5 8 -9 19 -11 18 -3 19 4 20 95
+1 106 16 145 60 151 15 2 21 10 21 28 0 30 -27 32 -58 4 -26 -24 -30 -25 -28
+-3 0 10 -7 19 -16 21 -17 3 -18 -9 -18 -137z"/>
+<path d="M3184 3410 c-79 -32 -97 -179 -31 -256 29 -34 100 -44 145 -20 34 17
+37 23 23 44 -6 11 -15 10 -43 -4 -48 -22 -87 -9 -111 37 l-17 34 97 5 98 5 -3
+39 c-8 95 -80 148 -158 116z m91 -55 c14 -13 25 -33 25 -45 0 -18 -6 -20 -70
+-20 -64 0 -70 2 -70 20 0 27 43 70 70 70 12 0 32 -11 45 -25z"/>
+<path d="M3754 3404 c-45 -22 -64 -62 -64 -136 0 -96 42 -147 122 -148 92 -1
+146 122 99 227 -30 66 -93 89 -157 57z m86 -39 c64 -33 63 -157 -1 -190 -58
+-31 -109 15 -109 97 0 41 5 54 29 79 34 33 41 35 81 14z"/>
+<path d="M4740 3407 c-43 -22 -70 -74 -70 -134 0 -93 49 -153 124 -153 44 0
+86 22 86 45 0 23 -16 26 -48 9 -50 -24 -100 -2 -116 54 -7 22 -6 22 88 22 l96
+0 0 36 c0 98 -82 160 -160 121z m103 -59 c9 -11 17 -29 17 -39 0 -17 -8 -19
+-75 -19 -87 0 -95 11 -45 62 25 24 36 29 58 24 15 -4 35 -16 45 -28z"/>
+<path d="M5260 3270 c0 -143 1 -150 20 -150 19 0 20 7 20 150 0 143 -1 150
+-20 150 -19 0 -20 -7 -20 -150z"/>
+<path d="M5431 3407 c-104 -53 -86 -262 24 -283 45 -8 80 1 105 28 17 19 18
+24 6 36 -12 12 -18 11 -44 -8 -20 -15 -37 -20 -51 -15 -84 26 -91 172 -10 206
+27 10 34 9 60 -10 23 -17 33 -20 44 -11 19 16 8 38 -26 55 -34 18 -76 19 -108
+2z"/>
+<path d="M5652 3405 c-29 -13 -32 -17 -22 -35 12 -23 21 -25 37 -9 6 6 28 11
+48 12 41 1 65 -21 65 -60 0 -21 -4 -23 -55 -23 -46 0 -60 -4 -80 -25 -53 -52
+-18 -145 54 -145 20 0 47 7 59 16 20 14 22 14 22 0 0 -9 9 -16 20 -16 19 0 20
+7 20 121 0 120 0 121 -29 150 -34 33 -83 38 -139 14z m126 -177 c6 -51 -71
+-91 -106 -56 -36 36 7 91 68 86 30 -3 35 -7 38 -30z"/>
+<path d="M6422 3296 c3 -116 5 -126 27 -150 28 -30 85 -35 117 -11 25 19 34
+19 34 0 0 -8 9 -15 20 -15 19 0 20 7 20 150 0 140 -1 150 -19 150 -17 0 -19
+-10 -23 -98 -4 -120 -20 -152 -73 -152 -54 0 -65 26 -65 147 0 98 -1 103 -21
+103 -20 0 -21 -4 -17 -124z"/>
+<path d="M6720 3215 c0 -198 1 -205 20 -205 18 0 20 7 20 70 0 39 3 70 8 70 4
+0 16 -7 26 -15 47 -36 125 -4 152 61 56 133 -61 281 -160 203 l-26 -20 0 20
+c0 14 -6 21 -20 21 -19 0 -20 -7 -20 -205z m160 145 c24 -13 43 -73 36 -114
+-9 -47 -40 -76 -81 -76 -47 0 -75 37 -75 100 0 81 57 124 120 90z"/>
+<path d="M7020 3215 c0 -198 1 -205 20 -205 18 0 20 7 20 71 l0 71 25 -16 c81
+-53 175 21 175 138 0 114 -98 185 -174 125 l-26 -20 0 20 c0 14 -6 21 -20 21
+-19 0 -20 -7 -20 -205z m150 150 c53 -27 64 -131 19 -176 -25 -25 -80 -25
+-104 1 -23 25 -30 107 -13 140 7 13 25 30 38 37 31 16 26 16 60 -2z"/>
+<path d="M7463 3386 c-33 -30 -37 -39 -41 -95 -8 -104 40 -171 122 -171 44 0
+86 22 86 45 0 23 -16 26 -48 9 -38 -19 -76 -10 -102 23 -37 47 -29 53 75 53
+l95 0 0 30 c0 74 -55 140 -116 140 -25 0 -44 -9 -71 -34z m100 -18 c28 -15 46
+-38 47 -60 0 -16 -10 -18 -75 -18 -86 0 -95 11 -46 61 33 32 42 34 74 17z"/>
+<path d="M7710 3270 c0 -143 1 -150 20 -150 19 0 20 7 20 95 0 121 14 155 65
+155 54 0 65 -26 65 -147 0 -95 2 -103 19 -103 17 0 19 10 23 104 3 116 18 146
+69 146 51 0 59 -20 59 -141 l0 -109 26 0 27 0 -7 116 c-9 152 -25 184 -92 184
+-31 0 -84 -27 -84 -42 0 -7 -13 0 -28 15 -32 31 -69 34 -112 12 -27 -14 -30
+-14 -30 0 0 8 -9 15 -20 15 -19 0 -20 -7 -20 -150z"/>
+<path d="M8211 3404 c-30 -21 -61 -89 -61 -134 0 -45 31 -113 61 -134 35 -24
+102 -21 133 7 38 33 22 52 -27 32 -50 -21 -99 -2 -115 44 -6 17 -8 31 -4 32 4
+0 48 1 97 2 l90 2 -3 39 c-4 48 -24 89 -54 110 -29 21 -87 20 -117 0z m83 -34
+c25 -9 60 -62 49 -74 -8 -8 -138 -8 -146 0 -9 9 20 61 40 73 23 13 26 13 57 1z"/>
+<path d="M8440 3270 c0 -140 1 -150 19 -150 16 0 19 12 25 103 9 120 21 147
+70 147 56 0 66 -21 66 -143 l0 -107 25 0 c25 0 25 0 25 94 0 117 -6 149 -36
+181 -27 29 -88 34 -120 10 -25 -19 -34 -19 -34 0 0 8 -9 15 -20 15 -19 0 -20
+-7 -20 -150z"/>
+<path d="M8935 3395 c-18 -17 -25 -35 -25 -64 0 -47 29 -76 90 -86 21 -4 44
+-13 50 -20 17 -21 2 -54 -27 -62 -24 -5 -38 -2 -94 21 -22 9 -32 -29 -13 -45
+21 -17 100 -23 133 -10 29 13 51 47 51 80 0 29 -38 69 -73 76 -71 15 -101 61
+-56 85 19 11 40 9 90 -6 11 -3 18 3 22 16 12 45 -107 57 -148 15z"/>
+<path d="M9650 3270 c0 -143 1 -150 20 -150 17 0 20 7 20 48 2 106 10 156 32
+179 12 13 30 23 40 23 13 0 18 7 18 25 0 32 -27 33 -64 4 l-26 -20 0 20 c0 14
+-6 21 -20 21 -19 0 -20 -7 -20 -150z"/>
+<path d="M9848 3404 c-30 -16 -32 -22 -20 -42 7 -10 16 -9 45 3 42 17 79 8 97
+-25 19 -35 6 -50 -44 -50 -62 0 -95 -17 -105 -54 -9 -37 3 -86 26 -103 23 -18
+84 -16 111 3 20 14 22 14 22 0 0 -9 9 -16 20 -16 19 0 20 7 20 105 0 114 -14
+166 -48 184 -29 15 -92 13 -124 -5z m110 -150 c28 -8 28 -33 1 -68 -13 -17
+-30 -26 -48 -26 -35 0 -51 17 -51 52 0 39 42 57 98 42z"/>
+<path d="M10132 3404 c-96 -67 -58 -284 50 -284 19 0 43 7 54 15 10 8 22 15
+27 15 4 0 7 -31 7 -70 0 -63 2 -70 20 -70 19 0 20 7 20 205 0 198 -1 205 -20
+205 -11 0 -20 -7 -20 -15 0 -14 -3 -14 -30 0 -37 19 -80 19 -108 -1z m117 -60
+c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
+-7 54 -26z"/>
+</g>
+</svg>
+          </span>
+          <span class="font-display font-extrabold text-xl text-white">Tibaba <span class="text-cyan-400">·</span> طبابة</span>
+        </div>
+        <p class="text-sm max-w-xs" data-i18n="footerAbout">Iraq's marketplace for medical devices, supplements and everyday health essentials — connecting consumers with verified sellers.</p>
+        <div class="mt-5 space-y-2 text-sm">
+          <a href="tel:+9647701234567" dir="ltr" data-track="call" data-track-loc="footer" class="flex items-center gap-2 hover:text-cyan-400 transition-colors w-fit">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>
+            <span class="nums">+964 770 123 4567</span>
+          </a>
+          <a href="https://wa.me/9647701234567" target="_blank" rel="noopener" data-track="whatsapp" data-track-loc="footer" class="flex items-center gap-2 hover:text-cyan-400 transition-colors w-fit">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 1 1-4.1-7.3L21 5l-1 4.5"/></svg>
+            <span data-i18n="whatsappUs">WhatsApp us</span>
+          </a>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="font-display font-bold text-white mb-3 text-sm tracking-wide uppercase" data-i18n="footerShop">Shop</h4>
+        <ul id="footerCatList" class="space-y-2 text-sm"></ul>
+      </div>
+
+      <div>
+        <h4 class="font-display font-bold text-white mb-3 text-sm tracking-wide uppercase" data-i18n="footerCompany">Company</h4>
+        <ul class="space-y-2 text-sm">
+          <li><a href="#shop-by-category" class="hover:text-cyan-400 transition-colors" data-i18n="footerAboutLink">About us</a></li>
+          <li><a href="#" class="hover:text-cyan-400 transition-colors" data-i18n="footerHowItWorks">How it works</a></li>
+          <li><a href="#" id="footerSellLink" class="hover:text-cyan-400 transition-colors" data-i18n="footerBecomeSeller">Become a seller</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 class="font-display font-bold text-white mb-3 text-sm tracking-wide uppercase" data-i18n="footerSupport">Support</h4>
+        <ul class="space-y-2 text-sm">
+          <li><a href="#" class="hover:text-cyan-400 transition-colors" data-i18n="footerHelp">Help center</a></li>
+          <li><a href="#" class="hover:text-cyan-400 transition-colors" data-i18n="footerShipping">Shipping &amp; delivery</a></li>
+          <li><a href="#" class="hover:text-cyan-400 transition-colors" data-i18n="footerReturns">Returns policy</a></li>
+          <li><a href="#" class="hover:text-cyan-400 transition-colors" data-i18n="footerPrivacy">Privacy policy</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-teal-100/50">
+      <p data-i18n="footerCopy">© 2026 Tibaba (طبابة). All rights reserved.</p>
+      <p data-i18n="footerTagline">Built for Iraq's medical marketplace.</p>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================= [BOTTOMNAV] ============================= -->
+<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-teal-900/10 safe-bottom" aria-label="Primary">
+  <div class="grid grid-cols-4 h-16">
+    <button type="button" data-nav="home" class="bottom-nav-btn flex flex-col items-center justify-center gap-1 text-teal-700">
+      <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      <span class="text-[11px] font-medium" data-i18n="navHome">Home</span>
+    </button>
+    <button type="button" data-nav="categories" class="bottom-nav-btn flex flex-col items-center justify-center gap-1 text-ink-900/60">
+      <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span class="text-[11px] font-medium" data-i18n="navCategories">Categories</span>
+    </button>
+    <button type="button" data-nav="search" class="bottom-nav-btn flex flex-col items-center justify-center gap-1 text-ink-900/60">
+      <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      <span class="text-[11px] font-medium" data-i18n="navSearch">Search</span>
+    </button>
+    <button type="button" data-nav="submit" class="bottom-nav-btn flex flex-col items-center justify-center gap-1 text-ink-900/60">
+      <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      <span class="text-[11px] font-medium" data-i18n="navSubmit">Submit</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ============================= [MODAL-SUBMIT] ============================= -->
+<div id="submitModalBackdrop" class="hidden fixed inset-0 bg-ink-900/50 z-[80]"></div>
+<div id="submitModal" class="hidden fixed inset-x-0 bottom-0 md:inset-0 z-[90]" role="dialog" aria-modal="true" aria-labelledby="submitModalTitle">
+  <div class="bg-white w-full md:max-w-lg md:rounded-3xl rounded-t-3xl max-h-[92vh] overflow-y-auto">
+    <div class="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b border-teal-900/10">
+      <h3 id="submitModalTitle" class="font-display font-bold text-lg text-ink-900" data-i18n="modalTitle">List a product</h3>
+      <button type="button" id="submitModalCloseBtn" class="p-2 -me-2" aria-label="Close">
+        <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+
+    <form id="submitForm" class="p-5 space-y-4" novalidate>
+      <p class="text-sm text-slate-500" data-i18n="modalSub">No account needed. We'll reach out on WhatsApp once it's reviewed.</p>
+
+      <div>
+        <label for="f_name" class="block text-sm font-medium text-ink-900 mb-1.5" data-i18n="fieldName">Full name</label>
+        <input id="f_name" name="name" type="text" required class="w-full h-11 rounded-xl border border-teal-900/15 px-3.5 text-sm focus:border-teal-600 outline-none">
+      </div>
+      <div>
+        <label for="f_phone" class="block text-sm font-medium text-ink-900 mb-1.5" data-i18n="fieldPhone">Phone / WhatsApp number</label>
+        <input id="f_phone" name="phone" type="tel" dir="ltr" required class="w-full h-11 rounded-xl border border-teal-900/15 px-3.5 text-sm focus:border-teal-600 outline-none nums" placeholder="07XX XXX XXXX">
+      </div>
+      <div>
+        <label for="f_product" class="block text-sm font-medium text-ink-900 mb-1.5" data-i18n="fieldProductName">Product name</label>
+        <input id="f_product" name="product" type="text" required class="w-full h-11 rounded-xl border border-teal-900/15 px-3.5 text-sm focus:border-teal-600 outline-none">
+      </div>
+      <div>
+        <label for="f_details" class="block text-sm font-medium text-ink-900 mb-1.5" data-i18n="fieldDetails">Details</label>
+        <textarea id="f_details" name="details" rows="3" required class="w-full rounded-xl border border-teal-900/15 px-3.5 py-2.5 text-sm focus:border-teal-600 outline-none resize-none"></textarea>
+      </div>
+      <div>
+        <label for="f_price" class="block text-sm font-medium text-ink-900 mb-1.5" data-i18n="fieldPrice">Price</label>
+        <div class="flex gap-2">
+          <input id="f_price" name="price" type="number" min="0" dir="ltr" inputmode="numeric" required class="flex-1 min-w-0 h-11 rounded-xl border border-teal-900/15 px-3.5 text-sm focus:border-teal-600 outline-none nums" placeholder="0">
+          <div id="currencyPicker" class="flex rounded-xl border border-teal-900/15 overflow-hidden shrink-0" role="radiogroup" aria-label="Currency">
+            <button type="button" data-currency="IQD" class="currency-btn px-4 text-sm font-display font-semibold transition-colors bg-teal-700 text-white" aria-pressed="true">IQD</button>
+            <button type="button" data-currency="USD" class="currency-btn px-4 text-sm font-display font-semibold transition-colors bg-white text-teal-800 border-s border-teal-900/15" aria-pressed="false">USD</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label for="f_image" class="block text-sm font-medium text-ink-900 mb-1.5" data-i18n="fieldImage">Product image</label>
+        <input id="f_image" name="image" type="file" accept="image/*" class="w-full text-sm file:me-3 file:h-9 file:px-4 file:rounded-full file:border-0 file:bg-teal-50 file:text-teal-800 file:font-medium">
+      </div>
+
+      <button type="submit" class="w-full h-12 rounded-full bg-teal-700 hover:bg-teal-600 transition-colors text-white font-display font-bold text-sm" data-i18n="modalSubmitCta">Submit for review</button>
+    </form>
+
+    <div id="submitSuccess" class="hidden p-8 text-center">
+      <div class="w-14 h-14 mx-auto rounded-full bg-teal-50 text-teal-700 flex items-center justify-center mb-4">
+        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg>
+      </div>
+      <h3 class="font-display font-bold text-lg text-ink-900" data-i18n="modalSuccessTitle">Submission received</h3>
+      <p class="text-sm text-slate-500 mt-1" data-i18n="modalSuccessSub">Our team will contact you on WhatsApp within 24 hours.</p>
+      <button type="button" id="submitSuccessCloseBtn" class="mt-6 h-11 px-6 rounded-full bg-teal-50 text-teal-800 font-display font-semibold text-sm" data-i18n="modalSuccessClose">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= [TOAST] ============================= -->
+<div id="toast" class="hidden fixed bottom-20 md:bottom-6 start-1/2 -translate-x-1/2 [dir=rtl]:translate-x-1/2 z-[100] bg-ink-900 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-lift"></div>
+
+<script>
+/* ===================================================================== */
+/* [SCRIPT:DATA]                                                          */
+/* ===================================================================== */
+const ICONS = {
+  pill:     '<path d="M4.5 14.5 14.5 4.5a5 5 0 1 1 7 7L11.5 21.5a5 5 0 1 1-7-7Z"/><path d="m8.5 8.5 7 7"/>',
+  device:   '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h3"/>',
+  shield:   '<path d="M12 3 4 6v6c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V6z"/>',
+  baby:     '<circle cx="12" cy="8" r="4"/><path d="M5 21c0-4 3-6 7-6s7 2 7 6"/>',
+  cross:    '<path d="M12 4v16M4 12h16" stroke-width="3"/>',
+  building: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 8h2M13 8h2M9 12h2M13 12h2M9 16h2M13 16h2"/>'
+};
+function iconSvg(name, cls){
+  return `<svg class="${cls||'w-5 h-5'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||ICONS.pill}</svg>`;
+}
+
+const CATALOG = [
+  { id:'devices', icon:'device', en:'Medical Devices', ar:'الأجهزة الطبية', subs:[
+    { en:'Monitoring', ar:'أجهزة المراقبة', subs:[ {en:'Blood Pressure Monitors',ar:'أجهزة قياس ضغط الدم'},{en:'Glucose Meters',ar:'أجهزة قياس السكر'},{en:'Pulse Oximeters',ar:'مقياس تأكسج النبض'} ]},
+    { en:'Diagnostic Tools', ar:'أدوات التشخيص', subs:[ {en:'Thermometers',ar:'موازين الحرارة'},{en:'Stethoscopes',ar:'سماعات طبية'},{en:'Otoscopes',ar:'منظار الأذن'} ]},
+    { en:'Mobility & Support', ar:'الحركة والدعم', subs:[ {en:'Wheelchairs',ar:'كراسي متحركة'},{en:'Walking Aids',ar:'مساعدات المشي'},{en:'Orthopedic Braces',ar:'دعامات تقويم العظام'} ]}
+  ]},
+  { id:'supplements', icon:'pill', en:'Vitamins & Supplements', ar:'الفيتامينات والمكملات', subs:[
+    { en:'Multivitamins', ar:'فيتامينات متعددة', subs:[ {en:'General',ar:'عامة'},{en:'Prenatal',ar:'لما قبل الولادة'},{en:'Kids',ar:'للأطفال'} ]},
+    { en:'Single Vitamins', ar:'فيتامينات مفردة', subs:[ {en:'Vitamin C',ar:'فيتامين سي'},{en:'Vitamin D',ar:'فيتامين د'},{en:'Iron',ar:'الحديد'} ]},
+    { en:'Specialty', ar:'متخصصة', subs:[ {en:'Omega-3',ar:'أوميغا 3'},{en:'Probiotics',ar:'البروبيوتيك'},{en:'Collagen',ar:'الكولاجين'} ]}
+  ]},
+  { id:'personal-care', icon:'shield', en:'Personal & Skin Care', ar:'العناية الشخصية والبشرة', subs:[
+    { en:'Dermo-cosmetics', ar:'مستحضرات تجميل طبية', subs:[ {en:'Sunscreen',ar:'واقي شمس'},{en:'Acne Care',ar:'علاج حب الشباب'},{en:'Anti-aging',ar:'مضاد الشيخوخة'} ]},
+    { en:'Hygiene', ar:'النظافة', subs:[ {en:'Hand Sanitizers',ar:'معقم اليدين'},{en:'Masks',ar:'الكمامات'},{en:'Gloves',ar:'القفازات'} ]},
+    { en:'Hair & Oral Care', ar:'العناية بالشعر والفم', subs:[ {en:'Hair Supplements',ar:'مكملات الشعر'},{en:'Oral Hygiene',ar:'نظافة الفم'} ]}
+  ]},
+  { id:'mother-baby', icon:'baby', en:'Mother & Baby', ar:'الأم والطفل', subs:[
+    { en:'Pregnancy Care', ar:'رعاية الحمل', subs:[ {en:'Prenatal Vitamins',ar:'فيتامينات الحمل'},{en:'Maternity Support',ar:'دعم الأمومة'} ]},
+    { en:'Baby Health', ar:'صحة الطفل', subs:[ {en:'Thermometers',ar:'موازين حرارة'},{en:'Baby First Aid',ar:'إسعافات أولية للأطفال'} ]},
+    { en:'Feeding & Nutrition', ar:'التغذية والرضاعة', subs:[ {en:'Formula Add-ons',ar:'إضافات الحليب'},{en:'Feeding Accessories',ar:'مستلزمات الرضاعة'} ]}
+  ]},
+  { id:'first-aid', icon:'cross', en:'First Aid & Safety', ar:'الإسعافات الأولية والسلامة', subs:[
+    { en:'Wound Care', ar:'العناية بالجروح', subs:[ {en:'Antiseptics',ar:'مطهرات'},{en:'Dressings',ar:'ضمادات'} ]},
+    { en:'Bandages', ar:'الأربطة', subs:[ {en:'Elastic Bandages',ar:'أربطة مرنة'},{en:'Adhesive Tape',ar:'شريط لاصق'} ]},
+    { en:'Emergency Kits', ar:'حقائب الطوارئ', subs:[ {en:'Home Kits',ar:'حقائب منزلية'},{en:'Travel Kits',ar:'حقائب سفر'} ]}
+  ]},
+  { id:'clinic-supplies', icon:'building', en:'Hospital & Clinic Supplies', ar:'مستلزمات المستشفيات والعيادات', subs:[
+    { en:'Consumables', ar:'المستهلكات', subs:[ {en:'Syringes',ar:'حقن'},{en:'Gloves',ar:'قفازات'},{en:'Surgical Masks',ar:'كمامات جراحية'} ]},
+    { en:'Furniture & Equipment', ar:'الأثاث والمعدات', subs:[ {en:'Exam Tables',ar:'طاولات الفحص'},{en:'Trolleys',ar:'عربات طبية'} ]},
+    { en:'Sterilization', ar:'التعقيم', subs:[ {en:'Autoclaves',ar:'أجهزة تعقيم'},{en:'Disinfectants',ar:'مطهرات'} ]}
+  ]}
+];
+
+const PRODUCTS = [
+  { id:'p1', cat:'devices', en:'Digital Blood Pressure Monitor', ar:'جهاز قياس ضغط الدم الرقمي', price:62, currency:'USD', tag:'new', icon:'device', rating:4.7 },
+  { id:'p2', cat:'supplements', en:'Vitamin C 1000mg Effervescent (20ct)', ar:'فيتامين سي ١٠٠٠ ملغ فوار (٢٠ قرص)', price:12000, currency:'IQD', tag:'sale', icon:'pill', rating:4.8 },
+  { id:'p3', cat:'devices', en:'Infrared Forehead Thermometer', ar:'ميزان حرارة بالأشعة تحت الحمراء', price:35000, currency:'IQD', tag:'verified', icon:'device', rating:4.6 },
+  { id:'p4', cat:'devices', en:'Fingertip Pulse Oximeter', ar:'مقياس تأكسج النبض', price:21, currency:'USD', tag:null, icon:'device', rating:4.5 },
+  { id:'p5', cat:'supplements', en:'Kids Multivitamin Gummies', ar:'فيتامينات هلامية متعددة للأطفال', price:15000, currency:'IQD', tag:'new', icon:'pill', rating:4.9 },
+  { id:'p6', cat:'personal-care', en:'N95 Protective Face Masks (50pk)', ar:'كمامات حماية N95 (٥٠ قطعة)', price:20000, currency:'IQD', tag:null, icon:'shield', rating:4.4 },
+  { id:'p7', cat:'devices', en:'Adjustable Folding Walking Cane', ar:'عصا مشي قابلة للطي وللتعديل', price:18000, currency:'IQD', tag:null, icon:'device', rating:4.3 },
+  { id:'p8', cat:'supplements', en:'Omega-3 Fish Oil Capsules (90ct)', ar:'كبسولات زيت السمك أوميغا ٣ (٩٠ كبسولة)', price:22000, currency:'IQD', tag:'sale', icon:'pill', rating:4.7 },
+  { id:'p9', cat:'first-aid', en:'Home Essentials First Aid Kit', ar:'حقيبة إسعافات أولية منزلية', price:23, currency:'USD', tag:'verified', icon:'cross', rating:4.8 },
+  { id:'p10', cat:'devices', en:'Glucose Test Strips (50ct)', ar:'شرائط فحص السكر (٥٠ شريط)', price:27000, currency:'IQD', tag:null, icon:'device', rating:4.5 },
+  { id:'p11', cat:'mother-baby', en:'Postnatal Multivitamin for Mothers', ar:'فيتامينات متعددة للأمهات بعد الولادة', price:19000, currency:'IQD', tag:'new', icon:'baby', rating:4.6 },
+  { id:'p12', cat:'devices', en:'Orthopedic Knee Support Brace', ar:'دعامة تقويم الركبة', price:18, currency:'USD', tag:null, icon:'device', rating:4.4 }
+];
+
+const TABS = [
+  { key:'new', en:'New Arrivals', ar:'وصل حديثاً' },
+  { key:'verified', en:'Best Sellers', ar:'الأكثر مبيعاً' },
+  { key:'devices', en:'Devices', ar:'الأجهزة' },
+  { key:'supplements', en:'Supplements', ar:'المكملات' }
+];
+
+const T = {
+  en: {
+    skipToContent:'Skip to content', brandHome:'Tibaba home', topbarMsg:'Verified medical sellers across Iraq · Cash on delivery available',
+    searchPlaceholder:'Search medicines, devices, vitamins…', sellWithUs:'Sell with us', categories:'Categories', submitProduct:'Submit a Product',
+    shopByCategory:'Shop by category', featuredProducts:'Featured products', addToCart:'Add', viewAll:'View all',
+    cartTitle:'Your cart', cartEmpty:'Your cart is empty', cartEmptySub:'Add a product to get started.',
+    cartSubtotal:'Subtotal', cartOrderWhatsapp:'Order via WhatsApp', cartRemove:'Remove', cartContinueShopping:'Continue shopping',
+    sellCtaTitle:'Have medical products to sell?', sellCtaSub:"List a product in minutes — no account needed. Our team reviews every listing and reaches out on WhatsApp.",
+    sellCtaNote:'Free to list · Reviewed within 24 hours', whyTitle:'Why people trust Tibaba',
+    why1Title:'Verified pharmacies & sellers', why1Sub:'Every seller is reviewed before going live on the marketplace.',
+    why2Title:'Genuine products only', why2Sub:'Listings are checked against product details before approval.',
+    why3Title:'Delivery across Iraq', why3Sub:"From Basra to Duhok, with cash on delivery available.",
+    why4Title:'Easy support', why4Sub:'Reach a real person on WhatsApp for any order question.',
+    installTitle:'Install the Tibaba app', installHintIOS:'On iPhone: tap Share, then “Add to Home Screen”.', installCta:'Install app',
+    footerAbout:"Iraq's marketplace for medical devices, supplements and everyday health essentials — connecting consumers with verified sellers.",
+    whatsappUs:'WhatsApp us', footerShop:'Shop', footerCompany:'Company', footerAboutLink:'About us', footerHowItWorks:'How it works',
+    footerBecomeSeller:'Become a seller', footerSupport:'Support', footerHelp:'Help center', footerShipping:'Shipping & delivery',
+    footerReturns:'Returns policy', footerPrivacy:'Privacy policy', footerCopy:'© 2026 Tibaba (طبابة). All rights reserved.',
+    footerTagline:"Built for Iraq's medical marketplace.", navHome:'Home', navCategories:'Categories', navSearch:'Search', navSubmit:'Submit',
+    modalTitle:'List a product', modalSub:"No account needed. We'll reach out on WhatsApp once it's reviewed.",
+    fieldName:'Full name', fieldPhone:'Phone / WhatsApp number', fieldProductName:'Product name', fieldDetails:'Details',
+    fieldPrice:'Price', fieldImage:'Product image', modalSubmitCta:'Submit for review',
+    modalSuccessTitle:'Submission received', modalSuccessSub:'Our team will contact you on WhatsApp within 24 hours.', modalSuccessClose:'Done'
+  },
+  ar: {
+    skipToContent:'تخطّي إلى المحتوى', brandHome:'الصفحة الرئيسية لطبابة', topbarMsg:'بائعون طبيون موثوقون في جميع أنحاء العراق · الدفع عند الاستلام متاح',
+    searchPlaceholder:'ابحث عن أدوية، أجهزة، فيتامينات…', sellWithUs:'بيع معنا', categories:'الفئات', submitProduct:'أضف منتجاً',
+    shopByCategory:'تسوّق حسب الفئة', featuredProducts:'منتجات مميزة', addToCart:'أضف', viewAll:'عرض الكل',
+    cartTitle:'سلة التسوق', cartEmpty:'سلة التسوق فارغة', cartEmptySub:'أضف منتجاً للبدء.',
+    cartSubtotal:'المجموع', cartOrderWhatsapp:'اطلب عبر واتساب', cartRemove:'إزالة', cartContinueShopping:'متابعة التسوق',
+    sellCtaTitle:'لديك منتجات طبية للبيع؟', sellCtaSub:'أضف منتجك خلال دقائق — دون الحاجة لحساب. يراجع فريقنا كل قائمة ويتواصل معك عبر واتساب.',
+    sellCtaNote:'الإدراج مجاني · المراجعة خلال ٢٤ ساعة', whyTitle:'لماذا يثق الناس بطبابة',
+    why1Title:'صيدليات وبائعون موثوقون', why1Sub:'تتم مراجعة كل بائع قبل ظهوره في السوق.',
+    why2Title:'منتجات أصلية فقط', why2Sub:'تُراجَع القوائم مقابل تفاصيل المنتج قبل الموافقة عليها.',
+    why3Title:'توصيل في جميع أنحاء العراق', why3Sub:'من البصرة إلى دهوك، مع توفر الدفع عند الاستلام.',
+    why4Title:'دعم سهل', why4Sub:'تواصل مع شخص حقيقي عبر واتساب لأي استفسار حول طلبك.',
+    installTitle:'ثبّت تطبيق طبابة', installHintIOS:'على آيفون: اضغط على مشاركة ثم «إضافة إلى الشاشة الرئيسية».', installCta:'تثبيت التطبيق',
+    footerAbout:'سوق العراق للأجهزة الطبية والمكملات الغذائية ومستلزمات الصحة اليومية — يربط المستهلكين ببائعين موثوقين.',
+    whatsappUs:'تواصل عبر واتساب', footerShop:'تسوّق', footerCompany:'الشركة', footerAboutLink:'من نحن', footerHowItWorks:'كيف يعمل',
+    footerBecomeSeller:'كن بائعاً', footerSupport:'الدعم', footerHelp:'مركز المساعدة', footerShipping:'الشحن والتوصيل',
+    footerReturns:'سياسة الإرجاع', footerPrivacy:'سياسة الخصوصية', footerCopy:'© ٢٠٢٦ طبابة (Tibaba). جميع الحقوق محفوظة.',
+    footerTagline:'صُمم لسوق العراق الطبي.', navHome:'الرئيسية', navCategories:'الفئات', navSearch:'بحث', navSubmit:'أضف',
+    modalTitle:'أضف منتجاً', modalSub:'دون الحاجة لحساب. سنتواصل معك عبر واتساب بعد المراجعة.',
+    fieldName:'الاسم الكامل', fieldPhone:'رقم الهاتف / واتساب', fieldProductName:'اسم المنتج', fieldDetails:'التفاصيل',
+    fieldPrice:'السعر', fieldImage:'صورة المنتج', modalSubmitCta:'إرسال للمراجعة',
+    modalSuccessTitle:'تم استلام الطلب', modalSuccessSub:'سيتواصل فريقنا معك عبر واتساب خلال ٢٤ ساعة.', modalSuccessClose:'تم'
+  }
+};
+
+/* ===================================================================== */
+/* [SCRIPT:STATE]                                                         */
+/* ===================================================================== */
+let currentLang = localStorage.getItem('tibaba_lang') || 'ar';
+let activeTab = 'new';
+let cart = [];
+
+/* ===================================================================== */
+/* [SCRIPT:I18N]                                                          */
+/* ===================================================================== */
+function applyLang(lang){
+  currentLang = lang;
+  localStorage.setItem('tibaba_lang', lang);
+  const dir = lang === 'ar' ? 'rtl' : 'ltr';
+  document.documentElement.lang = lang;
+  document.documentElement.dir = dir;
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (T[lang][key]) el.textContent = T[lang][key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (T[lang][key]) el.placeholder = T[lang][key];
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    const key = el.getAttribute('data-i18n-aria');
+    if (T[lang][key]) el.setAttribute('aria-label', T[lang][key]);
+  });
+
+  document.getElementById('langToggleHeaderLabel').textContent = lang === 'en' ? 'AR' : 'EN';
+
+  renderCategoryStrip(); renderDrawer(); renderCategoryGrid(); renderProductTabs(); renderProducts(); renderFooterCategories(); renderCartDrawer();
+}
+
+/* ===================================================================== */
+/* [SCRIPT:RENDER]                                                        */
+/* ===================================================================== */
+function renderCategoryStrip(){
+  const ul = document.getElementById('catStrip');
+  ul.innerHTML = CATALOG.map(c => `
+    <li class="relative group h-full">
+      <a href="#shop-by-category" class="h-full flex items-center gap-1.5 hover:text-teal-700 transition-colors whitespace-nowrap">
+        ${c[currentLang]}
+        <svg class="w-3.5 h-3.5 text-ink-900/40 group-hover:text-teal-700 transition-transform duration-200 group-hover:rotate-180 group-focus-within:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </a>
+      <div class="invisible opacity-0 translate-y-1 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:visible group-focus-within:opacity-100 group-focus-within:translate-y-0 transition-all duration-150 absolute top-full start-0 pt-3 z-50">
+        <div class="w-[34rem] max-w-[80vw] bg-white rounded-2xl shadow-lift border border-teal-900/10 p-6 grid grid-cols-3 gap-6">
+          ${c.subs.map(s => `
+            <div>
+              <p class="text-xs font-display font-bold uppercase tracking-wide text-teal-700 mb-2.5">${s[currentLang]}</p>
+              <ul class="space-y-2">
+                ${s.subs.map(ss => `<li><a href="#shop-by-category" class="text-sm text-ink-900/70 hover:text-teal-700 transition-colors">${ss[currentLang]}</a></li>`).join('')}
+              </ul>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </li>
+  `).join('');
+}
+
+function renderDrawer(){
+  const wrap = document.getElementById('drawerList');
+  wrap.innerHTML = CATALOG.map((c, i) => `
+    <details class="border-b border-teal-900/10" ${i===0 ? 'open' : ''}>
+      <summary class="flex items-center justify-between py-3.5 px-2">
+        <span class="flex items-center gap-3 font-medium text-ink-900">
+          <span class="text-teal-700">${iconSvg(c.icon,'w-5 h-5')}</span>${c[currentLang]}
+        </span>
+        <svg class="chev w-4 h-4 text-slate-500 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </summary>
+      <div class="pb-3 ps-11 pe-2 space-y-3">
+        ${c.subs.map(s => `
+          <div>
+            <p class="text-sm font-semibold text-ink-900/80 mb-1">${s[currentLang]}</p>
+            <ul class="space-y-1.5">
+              ${s.subs.map(ss => `<li><a href="#shop-by-category" class="text-sm text-slate-500 hover:text-teal-700 transition-colors">${ss[currentLang]}</a></li>`).join('')}
+            </ul>
+          </div>`).join('')}
+      </div>
+    </details>
+  `).join('');
+}
+
+function renderCategoryGrid(){
+  const grid = document.getElementById('categoryGrid');
+  grid.innerHTML = CATALOG.map(c => `
+    <a href="#shop-by-category" class="group flex flex-col items-center gap-2.5 rounded-2xl border border-teal-900/10 bg-white p-4 hover:border-teal-600 hover:shadow-card transition-all text-center">
+      <span class="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-700 group-hover:text-white flex items-center justify-center transition-colors">${iconSvg(c.icon,'w-6 h-6')}</span>
+      <span class="text-xs sm:text-sm font-medium text-ink-900 clamp-2">${c[currentLang]}</span>
+    </a>
+  `).join('');
+}
+
+function renderProductTabs(){
+  const wrap = document.getElementById('productTabs');
+  wrap.innerHTML = TABS.map(t => `
+    <button type="button" data-tab="${t.key}" class="tab-btn h-9 px-4 rounded-full text-sm font-display font-semibold whitespace-nowrap transition-colors ${t.key===activeTab ? 'bg-teal-700 text-white' : 'bg-teal-50 text-teal-800 hover:bg-teal-100'}">${t[currentLang]}</button>
+  `).join('');
+  wrap.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    activeTab = btn.getAttribute('data-tab');
+    trackEvent('product_tab_change', { tab: activeTab });
+    renderProductTabs(); renderProducts();
+  }));
+}
+
+function formatMoney(amount, currency){
+  if (currency === 'USD') return `$${amount.toLocaleString('en-US')}`;
+  return `${amount.toLocaleString(currentLang === 'ar' ? 'ar-IQ' : 'en-US')} ${currentLang === 'ar' ? 'د.ع' : 'IQD'}`;
+}
+
+function renderProducts(){
+  const grid = document.getElementById('productGrid');
+  const list = PRODUCTS.filter(p => p.tag === activeTab || p.cat === activeTab).slice(0, 8);
+  const finalList = list.length ? list : PRODUCTS.slice(0, 8);
+  const tagLabel = { new: { en:'New', ar:'جديد' }, sale: { en:'Sale', ar:'تخفيض' }, verified: { en:'Verified', ar:'موثوق' } };
+
+  grid.innerHTML = finalList.map(p => `
+    <div class="group rounded-2xl border border-teal-900/10 bg-white overflow-hidden hover:shadow-card transition-shadow flex flex-col">
+      <div class="relative aspect-square bg-teal-50 flex items-center justify-center">
+        ${p.tag ? `<span class="absolute top-2.5 start-2.5 text-[11px] font-display font-bold px-2 py-1 rounded-full ${p.tag==='sale'?'bg-amber-400 text-amber-950':'bg-teal-700 text-white'}">${tagLabel[p.tag][currentLang]}</span>` : ''}
+        <span class="text-teal-300 group-hover:text-teal-400 transition-colors">${iconSvg(p.icon,'w-14 h-14')}</span>
+      </div>
+      <div class="p-3.5 flex flex-col flex-1">
+        <p class="text-sm font-medium text-ink-900 clamp-2 flex-1">${p[currentLang]}</p>
+        <div class="flex items-center gap-1 mt-2 text-amber-500 text-xs">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg>
+          <span class="nums">${p.rating}</span>
+        </div>
+        <div class="mt-2.5 flex items-center justify-between gap-2">
+          <span class="font-mono font-semibold text-teal-800 text-sm nums">${formatMoney(p.price, p.currency)}</span>
+          <button type="button" data-add="${p.id}" class="h-8 px-3 rounded-full bg-teal-50 text-teal-800 text-xs font-display font-bold hover:bg-teal-700 hover:text-white transition-colors">${T[currentLang].addToCart}</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => {
+    addToCart(btn.getAttribute('data-add'));
+    trackEvent('add_to_cart', { product_id: btn.getAttribute('data-add') });
+  }));
+}
+
+function renderFooterCategories(){
+  const ul = document.getElementById('footerCatList');
+  ul.innerHTML = CATALOG.map(c => `<li><a href="#shop-by-category" class="hover:text-cyan-400 transition-colors">${c[currentLang]}</a></li>`).join('');
+}
+
+function addToCart(productId){
+  const product = PRODUCTS.find(p => p.id === productId);
+  if (!product) return;
+  const line = cart.find(l => l.id === productId);
+  if (line) line.qty += 1; else cart.push({ id: productId, qty: 1 });
+  updateCartUI();
+  showToast(currentLang === 'ar' ? `أُضيف «${product.ar}» إلى السلة` : `Added “${product.en}” to cart`);
+}
+
+function removeFromCart(productId){
+  cart = cart.filter(l => l.id !== productId);
+  updateCartUI();
+  trackEvent('remove_from_cart', { product_id: productId });
+}
+
+function cartTotalQty(){ return cart.reduce((sum, l) => sum + l.qty, 0); }
+function cartSubtotalsByCurrency(){
+  const totals = {};
+  cart.forEach(l => {
+    const p = PRODUCTS.find(pr => pr.id === l.id);
+    if (!p) return;
+    totals[p.currency] = (totals[p.currency] || 0) + p.price * l.qty;
+  });
+  return totals;
+}
+function formatSubtotals(totals){
+  return Object.entries(totals).map(([cur, amt]) => formatMoney(amt, cur)).join('  +  ');
+}
+
+function updateCartUI(){
+  document.getElementById('cartCount').textContent = String(cartTotalQty());
+  renderCartDrawer();
+}
+
+function renderCartDrawer(){
+  const list = document.getElementById('cartList');
+  const footer = document.getElementById('cartFooter');
+
+  if (!cart.length){
+    footer.classList.add('hidden');
+    list.innerHTML = `
+      <div class="h-full flex flex-col items-center justify-center text-center px-6 py-16">
+        <div class="w-14 h-14 rounded-full bg-teal-50 text-teal-300 flex items-center justify-center mb-4">
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></svg>
+        </div>
+        <p class="font-display font-bold text-ink-900">${T[currentLang].cartEmpty}</p>
+        <p class="text-sm text-slate-500 mt-1">${T[currentLang].cartEmptySub}</p>
+      </div>`;
+    return;
+  }
+
+  footer.classList.remove('hidden');
+  list.innerHTML = cart.map(line => {
+    const p = PRODUCTS.find(pr => pr.id === line.id);
+    if (!p) return '';
+    return `
+      <div class="flex gap-3 py-4 border-b border-teal-900/10">
+        <span class="w-14 h-14 rounded-xl bg-teal-50 text-teal-400 flex items-center justify-center shrink-0">${iconSvg(p.icon,'w-7 h-7')}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-ink-900 clamp-2">${p[currentLang]}</p>
+          <div class="flex items-center justify-between mt-1.5">
+            <span class="font-mono text-sm text-teal-800 nums">${formatMoney(p.price, p.currency)} <span class="text-slate-500">× ${line.qty}</span></span>
+            <button type="button" data-remove="${p.id}" class="text-xs text-slate-500 hover:text-red-500 transition-colors">${T[currentLang].cartRemove}</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-remove]').forEach(btn => btn.addEventListener('click', () => removeFromCart(btn.getAttribute('data-remove'))));
+
+  document.getElementById('cartSubtotal').textContent = formatSubtotals(cartSubtotalsByCurrency());
+}
+
+function buildWhatsappOrderText(){
+  const lines = cart.map(line => {
+    const p = PRODUCTS.find(pr => pr.id === line.id);
+    if (!p) return '';
+    return `• ${p[currentLang]} × ${line.qty} — ${formatMoney(p.price * line.qty, p.currency)}`;
+  }).filter(Boolean).join('\n');
+  const total = formatSubtotals(cartSubtotalsByCurrency());
+  return currentLang === 'ar'
+    ? `مرحباً، أرغب بطلب التالي من طبابة:\n\n${lines}\n\nالمجموع: ${total}`
+    : `Hi, I'd like to order the following from Tibaba:\n\n${lines}\n\nTotal: ${total}`;
+}
+
+/* ===================================================================== */
+/* [SCRIPT:TRACKING] — stubbed hooks, ready to POST to the Worker/Supabase in Step 4 */
+/* ===================================================================== */
+const SESSION_ID = (() => {
+  let sid = sessionStorage.getItem('tibaba_sid');
+  if (!sid) { sid = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2); sessionStorage.setItem('tibaba_sid', sid); }
+  return sid;
+})();
+const PAGE_LOAD_TS = Date.now();
+
+function deviceType(){
+  const ua = navigator.userAgent;
+  if (/Tablet|iPad/i.test(ua)) return 'tablet';
+  if (/Mobi|Android/i.test(ua)) return 'mobile';
+  return 'desktop';
+}
+
+function sendToAnalytics(event){
+  // TODO(Step 4): fetch(WORKER_URL + '/track', { method:'POST', body: JSON.stringify(event) })
+  // Routed to the Supabase visitor_logs table per the architecture roadmap.
+  console.debug('[tibaba:track]', event.type, event);
+}
+
+function trackEvent(type, payload = {}){
+  sendToAnalytics({
+    type, payload,
+    session_id: SESSION_ID,
+    url: location.href,
+    referrer: document.referrer || null,
+    lang: currentLang,
+    device: deviceType(),
+    ts: Date.now()
+  });
+}
+
+let searchDebounce;
+function trackSearchInput(value){
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => { if (value.trim()) trackEvent('search_query', { q: value.trim() }); }, 600);
+}
+
+/* ===================================================================== */
+/* [SCRIPT:PWA]                                                           */
+/* ===================================================================== */
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('pwaInstallBtn');
+  btn.classList.remove('hidden');
+  document.getElementById('installHintIOS').classList.add('hidden');
+});
+document.getElementById('pwaInstallBtn').addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  trackEvent('pwa_install_prompt', { outcome });
+  deferredInstallPrompt = null;
+});
+(() => {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (!isIOS || isStandalone) document.getElementById('installHintIOS').classList.add('hidden');
+})();
+
+/* ===================================================================== */
+/* [SCRIPT:UI WIRING]                                                     */
+/* ===================================================================== */
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.add('hidden'), 2400);
+}
+
+// Language toggles
+function toggleLang(){ applyLang(currentLang === 'en' ? 'ar' : 'en'); trackEvent('language_switch', { to: currentLang }); }
+document.getElementById('langToggleHeader').addEventListener('click', toggleLang);
+
+// Drawer
+const drawer = document.getElementById('catDrawer');
+const drawerBackdrop = document.getElementById('drawerBackdrop');
+function openDrawer(){
+  drawer.classList.remove('hidden'); drawerBackdrop.classList.remove('hidden');
+  drawer.classList.add('drawer-enter'); requestAnimationFrame(() => { drawer.classList.add('drawer-enter-active'); drawer.classList.remove('drawer-enter'); });
+  document.getElementById('drawerOpenBtn').setAttribute('aria-expanded', 'true');
+  setActiveNav('categories');
+}
+function closeDrawer(){
+  drawer.classList.remove('drawer-enter-active'); drawerBackdrop.classList.add('hidden');
+  setTimeout(() => drawer.classList.add('hidden'), 250);
+  document.getElementById('drawerOpenBtn').setAttribute('aria-expanded', 'false');
+  setActiveNav('home');
+}
+document.getElementById('drawerOpenBtn').addEventListener('click', openDrawer);
+document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
+drawerBackdrop.addEventListener('click', closeDrawer);
+document.getElementById('drawerSellBtn').addEventListener('click', () => { closeDrawer(); openSubmitModal(); });
+
+// Cart drawer
+const cartDrawer = document.getElementById('cartDrawer');
+const cartDrawerBackdrop = document.getElementById('cartDrawerBackdrop');
+function openCartDrawer(){
+  cartDrawer.classList.remove('hidden'); cartDrawerBackdrop.classList.remove('hidden');
+  cartDrawer.classList.add('drawer-end-enter'); requestAnimationFrame(() => { cartDrawer.classList.add('drawer-end-enter-active'); cartDrawer.classList.remove('drawer-end-enter'); });
+  renderCartDrawer();
+  trackEvent('cart_open', { items: cartTotalQty() });
+}
+function closeCartDrawer(){
+  cartDrawer.classList.remove('drawer-end-enter-active'); cartDrawerBackdrop.classList.add('hidden');
+  setTimeout(() => cartDrawer.classList.add('hidden'), 250);
+}
+document.getElementById('cartBtn').addEventListener('click', openCartDrawer);
+document.getElementById('cartCloseBtn').addEventListener('click', closeCartDrawer);
+cartDrawerBackdrop.addEventListener('click', closeCartDrawer);
+document.getElementById('cartWhatsappBtn').addEventListener('click', () => {
+  if (!cart.length) return;
+  trackEvent('cart_whatsapp_order', { items: cartTotalQty(), subtotals: cartSubtotalsByCurrency() });
+  window.open(`https://wa.me/9647701234567?text=${encodeURIComponent(buildWhatsappOrderText())}`, '_blank', 'noopener');
+});
+
+// Mobile search overlay
+const searchOverlay = document.getElementById('searchOverlay');
+function toggleSearchOverlay(open){
+  searchOverlay.classList.toggle('hidden', !open);
+  document.getElementById('searchOpenBtnMobile').setAttribute('aria-expanded', String(open));
+  if (open) document.getElementById('searchInputMobile').focus();
+}
+document.getElementById('searchOpenBtnMobile').addEventListener('click', () => {
+  const willOpen = searchOverlay.classList.contains('hidden');
+  toggleSearchOverlay(willOpen);
+  setActiveNav(willOpen ? 'search' : 'home');
+});
+document.getElementById('searchInputDesktop').addEventListener('input', e => trackSearchInput(e.target.value));
+document.getElementById('searchInputMobile').addEventListener('input', e => trackSearchInput(e.target.value));
+document.getElementById('searchFormDesktop').addEventListener('submit', e => e.preventDefault());
+document.getElementById('searchFormMobile').addEventListener('submit', e => e.preventDefault());
+
+// Submit modal
+const submitModalBackdrop = document.getElementById('submitModalBackdrop');
+const submitModal = document.getElementById('submitModal');
+const submitForm = document.getElementById('submitForm');
+const submitSuccess = document.getElementById('submitSuccess');
+let selectedCurrency = 'IQD';
+function setSelectedCurrency(cur){
+  selectedCurrency = cur;
+  document.querySelectorAll('.currency-btn').forEach(btn => {
+    const active = btn.getAttribute('data-currency') === cur;
+    btn.setAttribute('aria-pressed', String(active));
+    btn.classList.toggle('bg-teal-700', active);
+    btn.classList.toggle('text-white', active);
+    btn.classList.toggle('bg-white', !active);
+    btn.classList.toggle('text-teal-800', !active);
+  });
+}
+document.querySelectorAll('.currency-btn').forEach(btn => btn.addEventListener('click', () => setSelectedCurrency(btn.getAttribute('data-currency'))));
+function openSubmitModal(){
+  submitForm.reset(); submitForm.classList.remove('hidden'); submitSuccess.classList.add('hidden');
+  setSelectedCurrency('IQD');
+  submitModalBackdrop.classList.remove('hidden');
+  submitModal.classList.remove('hidden');
+  submitModal.classList.add('md:flex', 'md:items-center', 'md:justify-center');
+  const panel = submitModal.firstElementChild;
+  panel.classList.add('sheet-enter'); requestAnimationFrame(() => { panel.classList.add('sheet-enter-active'); panel.classList.remove('sheet-enter'); });
+  document.getElementById('f_name').focus();
+  trackEvent('submit_modal_open', {});
+}
+function closeSubmitModal(){
+  const panel = submitModal.firstElementChild;
+  panel.classList.remove('sheet-enter-active');
+  submitModalBackdrop.classList.add('hidden');
+  setTimeout(() => { submitModal.classList.add('hidden'); submitModal.classList.remove('md:flex', 'md:items-center', 'md:justify-center'); }, 200);
+  setActiveNav('home');
+}
+[document.getElementById('sellHeaderBtn'), document.getElementById('sellCtaBtn'), document.getElementById('footerSellLink')]
+  .forEach(btn => btn && btn.addEventListener('click', (e) => { e.preventDefault(); openSubmitModal(); }));
+document.getElementById('submitModalCloseBtn').addEventListener('click', closeSubmitModal);
+submitModalBackdrop.addEventListener('click', closeSubmitModal);
+document.getElementById('submitSuccessCloseBtn').addEventListener('click', closeSubmitModal);
+
+submitForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const hasImage = document.getElementById('f_image').files.length > 0;
+  trackEvent('product_submission', { has_image: hasImage, currency: selectedCurrency });
+  submitForm.classList.add('hidden');
+  submitSuccess.classList.remove('hidden');
+});
+
+// Bottom nav
+function setActiveNav(name){
+  document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+    const active = b.getAttribute('data-nav') === name;
+    b.classList.toggle('text-teal-700', active);
+    b.classList.toggle('text-ink-900/60', !active);
+  });
+}
+document.querySelectorAll('.bottom-nav-btn').forEach(btn => btn.addEventListener('click', () => {
+  const target = btn.getAttribute('data-nav');
+  if (target === 'home') { window.scrollTo({ top: 0, behavior: 'smooth' }); setActiveNav('home'); toggleSearchOverlay(false); }
+  if (target === 'categories') openDrawer();
+  if (target === 'search') { toggleSearchOverlay(true); setActiveNav('search'); }
+  if (target === 'submit') { openSubmitModal(); }
+}));
+
+// Escape key closes any open overlay
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!drawer.classList.contains('hidden')) closeDrawer();
+  if (!cartDrawer.classList.contains('hidden')) closeCartDrawer();
+  if (!submitModal.classList.contains('hidden')) closeSubmitModal();
+  if (!searchOverlay.classList.contains('hidden')) { toggleSearchOverlay(false); setActiveNav('home'); }
+});
+
+/* ===================================================================== */
+/* [SCRIPT:TRACKING] page-level events                                    */
+/* ===================================================================== */
+document.querySelectorAll('[data-track="call"], [data-track="whatsapp"]').forEach(el => {
+  el.addEventListener('click', () => trackEvent('contact_click', { method: el.getAttribute('data-track'), location: el.getAttribute('data-track-loc') }));
+});
+
+document.addEventListener('DOMContentLoaded', () => trackEvent('page_view', {}));
+window.addEventListener('pagehide', () => trackEvent('session_duration', { ms: Date.now() - PAGE_LOAD_TS }));
+
+/* ===================================================================== */
+/* [SCRIPT:INIT]                                                          */
+/* ===================================================================== */
+applyLang(currentLang);
+</script>
+</body>
+</html>
