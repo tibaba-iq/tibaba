@@ -13,8 +13,8 @@
     [CATSTRIP]         desktop category nav strip
     [DRAWER]           mobile off-canvas category drawer (3-level catalog)
     [SEARCHOVERLAY]    mobile search slide-down
-    [SHOPBYCAT]        category icon grid
-    [PRODUCTS]         tabbed product rail
+    [CATALOG-RAILS]    per-category product rails (one row preview + View All, multi-image gallery cards)
+    [CATEGORY-PAGE]    full paginated category view (in-flow, not an overlay — header stays visible)
     [SELLCTA]          guest product-submission CTA banner
     [WHY]              trust / value props
     [INSTALLAPP]       PWA install CTA
@@ -550,6 +550,11 @@ c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
       <ul id="catStrip" class="flex items-center gap-7 h-12 text-sm font-medium text-ink-900/80"></ul>
     </div>
   </nav>
+
+  <!-- ============================= [CATSTRIP-MOBILE] ============================= -->
+  <nav class="md:hidden border-t border-teal-900/10 bg-white" aria-label="Categories">
+    <ul id="catStripMobile" class="flex items-center gap-2 h-12 px-4 overflow-x-auto no-scrollbar"></ul>
+  </nav>
 </header>
 
 <!-- ============================= [SEARCHOVERLAY] ============================= -->
@@ -599,21 +604,10 @@ c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
 </aside>
 
 <main id="main">
-  <!-- ============================= [SHOPBYCAT] ============================= -->
-  <section id="shop-by-category" class="max-w-7xl mx-auto px-4 pt-10 pb-12 md:pt-14 md:pb-16">
-    <div class="flex items-end justify-between mb-6">
-      <h2 class="font-display font-extrabold text-2xl md:text-3xl text-ink-900" data-i18n="shopByCategory">Shop by category</h2>
-    </div>
-    <div id="categoryGrid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 md:gap-4"></div>
-  </section>
-
-  <!-- ============================= [PRODUCTS] ============================= -->
-  <section class="max-w-7xl mx-auto px-4 py-4 md:py-8">
-    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-      <h2 class="font-display font-extrabold text-2xl md:text-3xl text-ink-900" data-i18n="featuredProducts">Featured products</h2>
-      <div id="productTabs" class="flex items-center gap-2 overflow-x-auto no-scrollbar"></div>
-    </div>
-    <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5"></div>
+<div id="homeView">
+  <!-- ============================= [CATALOG-RAILS] ============================= -->
+  <section id="shop-by-category" class="max-w-7xl mx-auto px-4 pt-10 pb-4 md:pt-14 md:pb-8">
+    <div id="catalogRails" class="space-y-10 md:space-y-14"></div>
   </section>
 
   <!-- ============================= [SELLCTA] ============================= -->
@@ -671,6 +665,23 @@ c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
       <button type="button" id="pwaInstallBtn" class="hidden h-11 px-6 rounded-full bg-teal-700 text-white font-display font-semibold text-sm whitespace-nowrap" data-i18n="installCta">Install app</button>
     </div>
   </section>
+</div>
+
+<!-- ============================= [CATEGORY-PAGE] ============================= -->
+<div id="categoryPageView" class="hidden">
+  <div class="max-w-7xl mx-auto px-4 pt-6 pb-14 md:pb-20">
+    <div class="flex items-center gap-3 mb-6">
+      <button type="button" id="categoryPageBackBtn" class="p-2 -ms-2 text-ink-900" aria-label="Back">
+        <svg class="w-5.5 h-5.5 rtl:-scale-x-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <span id="categoryPageIcon" class="text-teal-700"></span>
+      <h1 id="categoryPageTitle" class="font-display font-extrabold text-lg md:text-xl text-ink-900"></h1>
+      <span id="categoryPageCount" class="text-xs text-slate-500 nums ms-1"></span>
+    </div>
+    <div id="categoryPageGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+    <div id="categoryPagePagination"></div>
+  </div>
+</div>
 </main>
 
 <!-- ============================= [FOOTER] ============================= -->
@@ -1138,6 +1149,19 @@ c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
   </div>
 </div>
 
+<!-- ============================= [PRODUCT-MODAL] ============================= -->
+<div id="productModalBackdrop" class="hidden fixed inset-0 bg-ink-900/50 z-[95]"></div>
+<div id="productModal" class="hidden fixed inset-x-0 bottom-0 md:inset-0 z-[96]" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+  <div class="bg-white w-full md:max-w-2xl md:rounded-3xl rounded-t-3xl md:mx-auto md:my-10 max-h-[92vh] overflow-y-auto">
+    <div class="sticky top-0 bg-white flex items-center justify-end px-4 py-3 border-b border-teal-900/10 z-10">
+      <button type="button" id="productModalCloseBtn" class="p-2 -me-2" aria-label="Close">
+        <svg class="w-5.5 h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div id="productModalContent"></div>
+  </div>
+</div>
+
 <!-- ============================= [TOAST] ============================= -->
 <div id="toast" class="hidden fixed bottom-20 md:bottom-6 start-1/2 -translate-x-1/2 [dir=rtl]:translate-x-1/2 z-[100] bg-ink-900 text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-lift"></div>
 
@@ -1190,37 +1214,104 @@ const CATALOG = [
   ]}
 ];
 
-const PRODUCTS = [
-  { id:'p1', cat:'devices', en:'Digital Blood Pressure Monitor', ar:'جهاز قياس ضغط الدم الرقمي', price:62, currency:'USD', tag:'new', icon:'device', rating:4.7 },
-  { id:'p2', cat:'supplements', en:'Vitamin C 1000mg Effervescent (20ct)', ar:'فيتامين سي ١٠٠٠ ملغ فوار (٢٠ قرص)', price:12000, currency:'IQD', tag:'sale', icon:'pill', rating:4.8 },
-  { id:'p3', cat:'devices', en:'Infrared Forehead Thermometer', ar:'ميزان حرارة بالأشعة تحت الحمراء', price:35000, currency:'IQD', tag:'verified', icon:'device', rating:4.6 },
-  { id:'p4', cat:'devices', en:'Fingertip Pulse Oximeter', ar:'مقياس تأكسج النبض', price:21, currency:'USD', tag:null, icon:'device', rating:4.5 },
-  { id:'p5', cat:'supplements', en:'Kids Multivitamin Gummies', ar:'فيتامينات هلامية متعددة للأطفال', price:15000, currency:'IQD', tag:'new', icon:'pill', rating:4.9 },
-  { id:'p6', cat:'personal-care', en:'N95 Protective Face Masks (50pk)', ar:'كمامات حماية N95 (٥٠ قطعة)', price:20000, currency:'IQD', tag:null, icon:'shield', rating:4.4 },
-  { id:'p7', cat:'devices', en:'Adjustable Folding Walking Cane', ar:'عصا مشي قابلة للطي وللتعديل', price:18000, currency:'IQD', tag:null, icon:'device', rating:4.3 },
-  { id:'p8', cat:'supplements', en:'Omega-3 Fish Oil Capsules (90ct)', ar:'كبسولات زيت السمك أوميغا ٣ (٩٠ كبسولة)', price:22000, currency:'IQD', tag:'sale', icon:'pill', rating:4.7 },
-  { id:'p9', cat:'first-aid', en:'Home Essentials First Aid Kit', ar:'حقيبة إسعافات أولية منزلية', price:23, currency:'USD', tag:'verified', icon:'cross', rating:4.8 },
-  { id:'p10', cat:'devices', en:'Glucose Test Strips (50ct)', ar:'شرائط فحص السكر (٥٠ شريط)', price:27000, currency:'IQD', tag:null, icon:'device', rating:4.5 },
-  { id:'p11', cat:'mother-baby', en:'Postnatal Multivitamin for Mothers', ar:'فيتامينات متعددة للأمهات بعد الولادة', price:19000, currency:'IQD', tag:'new', icon:'baby', rating:4.6 },
-  { id:'p12', cat:'devices', en:'Orthopedic Knee Support Brace', ar:'دعامة تقويم الركبة', price:18, currency:'USD', tag:null, icon:'device', rating:4.4 }
+/* Compact base templates per category. The full 20-per-category catalog below is generated
+   deterministically from these (test-scale data — see generateCatalog()), rather than hand-writing
+   120 product entries. Swap this whole block out once the real catalog API (Step 4) is wired up. */
+const CATEGORY_TEMPLATES = {
+  devices: [
+    { en:'Digital Blood Pressure Monitor', ar:'جهاز قياس ضغط الدم الرقمي', price:62, currency:'USD', rating:4.7 },
+    { en:'Infrared Forehead Thermometer', ar:'ميزان حرارة بالأشعة تحت الحمراء', price:35000, currency:'IQD', rating:4.6 },
+    { en:'Fingertip Pulse Oximeter', ar:'مقياس تأكسج النبض', price:21, currency:'USD', rating:4.5 },
+    { en:'Glucose Test Strips (50ct)', ar:'شرائط فحص السكر (٥٠ شريط)', price:27000, currency:'IQD', rating:4.5 },
+    { en:'Adjustable Folding Walking Cane', ar:'عصا مشي قابلة للطي وللتعديل', price:18000, currency:'IQD', rating:4.3 },
+    { en:'Orthopedic Knee Support Brace', ar:'دعامة تقويم الركبة', price:18, currency:'USD', rating:4.4 }
+  ],
+  supplements: [
+    { en:'Vitamin C 1000mg Effervescent (20ct)', ar:'فيتامين سي ١٠٠٠ ملغ فوار (٢٠ قرص)', price:12000, currency:'IQD', rating:4.8 },
+    { en:'Kids Multivitamin Gummies', ar:'فيتامينات هلامية متعددة للأطفال', price:15000, currency:'IQD', rating:4.9 },
+    { en:'Omega-3 Fish Oil Capsules (90ct)', ar:'كبسولات زيت السمك أوميغا ٣ (٩٠ كبسولة)', price:22000, currency:'IQD', rating:4.7 },
+    { en:'Vitamin D3 2000 IU Softgels', ar:'فيتامين د3 2000 وحدة دولية', price:14000, currency:'IQD', rating:4.6 },
+    { en:'Probiotic Complex Capsules', ar:'كبسولات البروبيوتيك المركبة', price:19, currency:'USD', rating:4.5 },
+    { en:'Collagen Peptides Powder', ar:'مسحوق ببتيدات الكولاجين', price:26, currency:'USD', rating:4.6 }
+  ],
+  'personal-care': [
+    { en:'N95 Protective Face Masks (50pk)', ar:'كمامات حماية N95 (٥٠ قطعة)', price:20000, currency:'IQD', rating:4.4 },
+    { en:'Hand Sanitizer Gel 500ml', ar:'جل معقم اليدين ٥٠٠ مل', price:7000, currency:'IQD', rating:4.5 },
+    { en:'Mineral Sunscreen SPF50', ar:'واقي شمس معدني SPF50', price:16, currency:'USD', rating:4.6 },
+    { en:'Disposable Nitrile Gloves (100pk)', ar:'قفازات نيتريل للاستخدام مرة واحدة (١٠٠ قطعة)', price:13000, currency:'IQD', rating:4.3 }
+  ],
+  'mother-baby': [
+    { en:'Postnatal Multivitamin for Mothers', ar:'فيتامينات متعددة للأمهات بعد الولادة', price:19000, currency:'IQD', rating:4.6 },
+    { en:'Baby Digital Thermometer', ar:'ميزان حرارة رقمي للأطفال', price:12, currency:'USD', rating:4.7 },
+    { en:'Prenatal DHA Capsules', ar:'كبسولات DHA لما قبل الولادة', price:24000, currency:'IQD', rating:4.5 },
+    { en:'Baby Nasal Aspirator Kit', ar:'طقم شفاط أنف للأطفال', price:9000, currency:'IQD', rating:4.4 }
+  ],
+  'first-aid': [
+    { en:'Home Essentials First Aid Kit', ar:'حقيبة إسعافات أولية منزلية', price:23, currency:'USD', rating:4.8 },
+    { en:'Adhesive Bandages Variety Pack', ar:'ضمادات لاصقة متنوعة المقاسات', price:5000, currency:'IQD', rating:4.5 },
+    { en:'Antiseptic Wound Spray', ar:'بخاخ مطهر للجروح', price:6500, currency:'IQD', rating:4.4 },
+    { en:'Elastic Compression Bandage', ar:'رباط ضاغط مرن', price:4000, currency:'IQD', rating:4.3 }
+  ],
+  'clinic-supplies': [
+    { en:'Disposable Syringes 5ml (100pk)', ar:'حقن طبية للاستخدام مرة واحدة ٥ مل (١٠٠ قطعة)', price:21000, currency:'IQD', rating:4.5 },
+    { en:'Examination Gloves Box (100pk)', ar:'علبة قفازات فحص (١٠٠ قطعة)', price:14000, currency:'IQD', rating:4.4 },
+    { en:'Surgical Face Masks (50pk)', ar:'كمامات جراحية (٥٠ قطعة)', price:17000, currency:'IQD', rating:4.5 },
+    { en:'Alcohol Disinfectant Wipes (200pk)', ar:'مناديل كحولية معقمة (٢٠٠ منديل)', price:9500, currency:'IQD', rating:4.3 }
+  ]
+};
+const VARIANT_MODIFIERS = [
+  { en:'', ar:'', mult:1 },
+  { en:' — Pro', ar:' — برو', mult:1.35 },
+  { en:' — Compact', ar:' — مدمج', mult:0.85 },
+  { en:' — Family Pack', ar:' — عبوة عائلية', mult:1.6 },
+  { en:' — Travel Size', ar:' — حجم السفر', mult:0.6 }
 ];
+const TAG_CYCLE = ['new', null, null, 'sale', null, null, 'verified', null, null, null];
+const IMAGE_TINTS = ['bg-teal-50 text-teal-300', 'bg-cyan-100/70 text-cyan-500', 'bg-sand-50 text-teal-400'];
 
-const TABS = [
-  { key:'new', en:'New Arrivals', ar:'وصل حديثاً' },
-  { key:'verified', en:'Best Sellers', ar:'الأكثر مبيعاً' },
-  { key:'devices', en:'Devices', ar:'الأجهزة' },
-  { key:'supplements', en:'Supplements', ar:'المكملات' }
-];
+function roundPrice(amount, currency){
+  return currency === 'USD' ? Math.max(1, Math.round(amount)) : Math.max(500, Math.round(amount / 250) * 250);
+}
+
+function generateCatalog(){
+  const products = [];
+  const CATALOG_SIZE_PER_CATEGORY = 50;
+  Object.entries(CATEGORY_TEMPLATES).forEach(([catId, templates]) => {
+    const catMeta = CATALOG.find(c => c.id === catId);
+    for (let i = 0; i < CATALOG_SIZE_PER_CATEGORY; i++){
+      const tpl = templates[i % templates.length];
+      const mod = VARIANT_MODIFIERS[Math.floor(i / templates.length) % VARIANT_MODIFIERS.length];
+      products.push({
+        id: `${catId}-${i + 1}`,
+        cat: catId,
+        en: tpl.en + mod.en,
+        ar: tpl.ar + mod.ar,
+        price: roundPrice(tpl.price * mod.mult, tpl.currency),
+        currency: tpl.currency,
+        tag: TAG_CYCLE[i % TAG_CYCLE.length],
+        icon: catMeta.icon,
+        rating: Math.round((tpl.rating - 0.1 + (i % 5) * 0.05) * 10) / 10,
+        images: IMAGE_TINTS
+      });
+    }
+  });
+  return products;
+}
+
+const PRODUCTS = generateCatalog();
 
 const T = {
   en: {
     skipToContent:'Skip to content', brandHome:'Tibaba home', topbarMsg:'Verified medical sellers across Iraq · Cash on delivery available',
     searchPlaceholder:'Search medicines, devices, vitamins…', sellWithUs:'Sell with us', categories:'Categories', submitProduct:'Submit a Product',
-    shopByCategory:'Shop by category', featuredProducts:'Featured products', addToCart:'Add', viewAll:'View all',
+    addToCart:'Add', viewAll:'View all', itemsCount:'items',
     cartTitle:'Your cart', cartEmpty:'Your cart is empty', cartEmptySub:'Add a product to get started.',
     cartSubtotal:'Subtotal', cartOrderWhatsapp:'Order via WhatsApp', cartRemove:'Remove', cartContinueShopping:'Continue shopping',
+    productGenericDesc:"Quality checked by Tibaba. Ships from a verified seller in Iraq.",
+    pagePrev:'Prev', pageNext:'Next',
     sellCtaTitle:'Have medical products to sell?', sellCtaSub:"List a product in minutes — no account needed. Our team reviews every listing and reaches out on WhatsApp.",
     sellCtaNote:'Free to list · Reviewed within 24 hours', whyTitle:'Why people trust Tibaba',
+
     why1Title:'Verified pharmacies & sellers', why1Sub:'Every seller is reviewed before going live on the marketplace.',
     why2Title:'Genuine products only', why2Sub:'Listings are checked against product details before approval.',
     why3Title:'Delivery across Iraq', why3Sub:"From Basra to Duhok, with cash on delivery available.",
@@ -1239,9 +1330,11 @@ const T = {
   ar: {
     skipToContent:'تخطّي إلى المحتوى', brandHome:'الصفحة الرئيسية لطبابة', topbarMsg:'بائعون طبيون موثوقون في جميع أنحاء العراق · الدفع عند الاستلام متاح',
     searchPlaceholder:'ابحث عن أدوية، أجهزة، فيتامينات…', sellWithUs:'بيع معنا', categories:'الفئات', submitProduct:'أضف منتجاً',
-    shopByCategory:'تسوّق حسب الفئة', featuredProducts:'منتجات مميزة', addToCart:'أضف', viewAll:'عرض الكل',
+    addToCart:'أضف', viewAll:'عرض الكل', itemsCount:'منتج',
     cartTitle:'سلة التسوق', cartEmpty:'سلة التسوق فارغة', cartEmptySub:'أضف منتجاً للبدء.',
     cartSubtotal:'المجموع', cartOrderWhatsapp:'اطلب عبر واتساب', cartRemove:'إزالة', cartContinueShopping:'متابعة التسوق',
+    productGenericDesc:'تم التحقق من الجودة من قبل طبابة. يُشحن من بائع موثوق في العراق.',
+    pagePrev:'السابق', pageNext:'التالي',
     sellCtaTitle:'لديك منتجات طبية للبيع؟', sellCtaSub:'أضف منتجك خلال دقائق — دون الحاجة لحساب. يراجع فريقنا كل قائمة ويتواصل معك عبر واتساب.',
     sellCtaNote:'الإدراج مجاني · المراجعة خلال ٢٤ ساعة', whyTitle:'لماذا يثق الناس بطبابة',
     why1Title:'صيدليات وبائعون موثوقون', why1Sub:'تتم مراجعة كل بائع قبل ظهوره في السوق.',
@@ -1265,7 +1358,6 @@ const T = {
 /* [SCRIPT:STATE]                                                         */
 /* ===================================================================== */
 let currentLang = localStorage.getItem('tibaba_lang') || 'ar';
-let activeTab = 'new';
 let cart = [];
 
 /* ===================================================================== */
@@ -1293,7 +1385,8 @@ function applyLang(lang){
 
   document.getElementById('langToggleHeaderLabel').textContent = lang === 'en' ? 'AR' : 'EN';
 
-  renderCategoryStrip(); renderDrawer(); renderCategoryGrid(); renderProductTabs(); renderProducts(); renderFooterCategories(); renderCartDrawer();
+  renderCategoryStrip(); renderCategoryStripMobile(); renderDrawer(); renderCatalogRails(); renderFooterCategories(); renderCartDrawer();
+  if (typeof routeFromHash === 'function') routeFromHash();
 }
 
 /* ===================================================================== */
@@ -1303,17 +1396,17 @@ function renderCategoryStrip(){
   const ul = document.getElementById('catStrip');
   ul.innerHTML = CATALOG.map(c => `
     <li class="relative group h-full">
-      <a href="#shop-by-category" class="h-full flex items-center gap-1.5 hover:text-teal-700 transition-colors whitespace-nowrap">
+      <button type="button" data-view-all="${c.id}" class="h-full flex items-center gap-1.5 hover:text-teal-700 transition-colors whitespace-nowrap">
         ${c[currentLang]}
         <svg class="w-3.5 h-3.5 text-ink-900/40 group-hover:text-teal-700 transition-transform duration-200 group-hover:rotate-180 group-focus-within:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-      </a>
+      </button>
       <div class="invisible opacity-0 translate-y-1 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-focus-within:visible group-focus-within:opacity-100 group-focus-within:translate-y-0 transition-all duration-150 absolute top-full start-0 pt-3 z-50">
         <div class="w-[34rem] max-w-[80vw] bg-white rounded-2xl shadow-lift border border-teal-900/10 p-6 grid grid-cols-3 gap-6">
           ${c.subs.map(s => `
             <div>
               <p class="text-xs font-display font-bold uppercase tracking-wide text-teal-700 mb-2.5">${s[currentLang]}</p>
               <ul class="space-y-2">
-                ${s.subs.map(ss => `<li><a href="#shop-by-category" class="text-sm text-ink-900/70 hover:text-teal-700 transition-colors">${ss[currentLang]}</a></li>`).join('')}
+                ${s.subs.map(ss => `<li><button type="button" data-view-all="${c.id}" class="text-sm text-ink-900/70 hover:text-teal-700 transition-colors text-start">${ss[currentLang]}</button></li>`).join('')}
               </ul>
             </div>
           `).join('')}
@@ -1323,10 +1416,31 @@ function renderCategoryStrip(){
   `).join('');
 }
 
+function renderCategoryStripMobile(){
+  const ul = document.getElementById('catStripMobile');
+  ul.innerHTML = CATALOG.map(c => `
+    <li class="shrink-0">
+      <button type="button" data-cat="${c.id}" class="cat-chip flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-teal-50 text-teal-800 text-sm font-medium whitespace-nowrap hover:bg-teal-100 transition-colors">
+        ${iconSvg(c.icon,'w-4 h-4')}
+        ${c[currentLang]}
+      </button>
+    </li>
+  `).join('');
+  ul.querySelectorAll('.cat-chip').forEach(btn => btn.addEventListener('click', () => openDrawerToCategory(btn.getAttribute('data-cat'))));
+}
+
+function openDrawerToCategory(catId){
+  openDrawer();
+  document.querySelectorAll('#drawerList details').forEach(d => { d.open = d.getAttribute('data-cat-id') === catId; });
+  const target = document.querySelector(`#drawerList details[data-cat-id="${catId}"]`);
+  if (target) target.scrollIntoView({ block: 'start' });
+  trackEvent('mobile_category_chip_click', { category: catId });
+}
+
 function renderDrawer(){
   const wrap = document.getElementById('drawerList');
   wrap.innerHTML = CATALOG.map((c, i) => `
-    <details class="border-b border-teal-900/10" ${i===0 ? 'open' : ''}>
+    <details class="border-b border-teal-900/10" data-cat-id="${c.id}" ${i===0 ? 'open' : ''}>
       <summary class="flex items-center justify-between py-3.5 px-2">
         <span class="flex items-center gap-3 font-medium text-ink-900">
           <span class="text-teal-700">${iconSvg(c.icon,'w-5 h-5')}</span>${c[currentLang]}
@@ -1338,7 +1452,7 @@ function renderDrawer(){
           <div>
             <p class="text-sm font-semibold text-ink-900/80 mb-1">${s[currentLang]}</p>
             <ul class="space-y-1.5">
-              ${s.subs.map(ss => `<li><a href="#shop-by-category" class="text-sm text-slate-500 hover:text-teal-700 transition-colors">${ss[currentLang]}</a></li>`).join('')}
+              ${s.subs.map(ss => `<li><button type="button" data-view-all="${c.id}" class="text-sm text-slate-500 hover:text-teal-700 transition-colors text-start">${ss[currentLang]}</button></li>`).join('')}
             </ul>
           </div>`).join('')}
       </div>
@@ -1346,68 +1460,90 @@ function renderDrawer(){
   `).join('');
 }
 
-function renderCategoryGrid(){
-  const grid = document.getElementById('categoryGrid');
-  grid.innerHTML = CATALOG.map(c => `
-    <a href="#shop-by-category" class="group flex flex-col items-center gap-2.5 rounded-2xl border border-teal-900/10 bg-white p-4 hover:border-teal-600 hover:shadow-card transition-all text-center">
-      <span class="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-700 group-hover:text-white flex items-center justify-center transition-colors">${iconSvg(c.icon,'w-6 h-6')}</span>
-      <span class="text-xs sm:text-sm font-medium text-ink-900 clamp-2">${c[currentLang]}</span>
-    </a>
-  `).join('');
-}
-
-function renderProductTabs(){
-  const wrap = document.getElementById('productTabs');
-  wrap.innerHTML = TABS.map(t => `
-    <button type="button" data-tab="${t.key}" class="tab-btn h-9 px-4 rounded-full text-sm font-display font-semibold whitespace-nowrap transition-colors ${t.key===activeTab ? 'bg-teal-700 text-white' : 'bg-teal-50 text-teal-800 hover:bg-teal-100'}">${t[currentLang]}</button>
-  `).join('');
-  wrap.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
-    activeTab = btn.getAttribute('data-tab');
-    trackEvent('product_tab_change', { tab: activeTab });
-    renderProductTabs(); renderProducts();
-  }));
-}
-
 function formatMoney(amount, currency){
   if (currency === 'USD') return `$${amount.toLocaleString('en-US')}`;
   return `${amount.toLocaleString(currentLang === 'ar' ? 'ar-IQ' : 'en-US')} ${currentLang === 'ar' ? 'د.ع' : 'IQD'}`;
 }
 
-function renderProducts(){
-  const grid = document.getElementById('productGrid');
-  const list = PRODUCTS.filter(p => p.tag === activeTab || p.cat === activeTab).slice(0, 8);
-  const finalList = list.length ? list : PRODUCTS.slice(0, 8);
-  const tagLabel = { new: { en:'New', ar:'جديد' }, sale: { en:'Sale', ar:'تخفيض' }, verified: { en:'Verified', ar:'موثوق' } };
+const TAG_LABEL = { new: { en:'New', ar:'جديد' }, sale: { en:'Sale', ar:'تخفيض' }, verified: { en:'Verified', ar:'موثوق' } };
 
-  grid.innerHTML = finalList.map(p => `
-    <div class="group rounded-2xl border border-teal-900/10 bg-white overflow-hidden hover:shadow-card transition-shadow flex flex-col">
-      <div class="relative aspect-square bg-teal-50 flex items-center justify-center">
-        ${p.tag ? `<span class="absolute top-2.5 start-2.5 text-[11px] font-display font-bold px-2 py-1 rounded-full ${p.tag==='sale'?'bg-amber-400 text-amber-950':'bg-teal-700 text-white'}">${tagLabel[p.tag][currentLang]}</span>` : ''}
-        <span class="text-teal-300 group-hover:text-teal-400 transition-colors">${iconSvg(p.icon,'w-14 h-14')}</span>
+function productCardHtml(p){
+  return `
+    <div class="product-card group rounded-2xl border border-teal-900/10 bg-white overflow-hidden hover:shadow-card transition-shadow flex flex-col cursor-pointer" data-product-id="${p.id}">
+      <div class="relative aspect-square" data-gallery data-index="0">
+        ${p.images.map((tint, idx) => `
+          <div class="gallery-slide absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${tint} ${idx === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}" data-slide="${idx}">
+            ${iconSvg(p.icon, 'w-12 h-12')}
+            <img src="https://picsum.photos/seed/${p.id}-${idx}/400/400" alt="" loading="lazy" width="400" height="400" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">
+          </div>
+        `).join('')}
+        ${p.tag ? `<span class="absolute top-2 start-2 text-[10px] font-display font-bold px-2 py-0.5 rounded-full z-10 ${p.tag === 'sale' ? 'bg-amber-400 text-amber-950' : 'bg-teal-700 text-white'}">${TAG_LABEL[p.tag][currentLang]}</span>` : ''}
+        <button type="button" class="gallery-prev absolute start-1 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-white/85 text-ink-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Previous image">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+        </button>
+        <button type="button" class="gallery-next absolute end-1 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-white/85 text-ink-900 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Next image">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></svg>
+        </button>
+        <div class="gallery-dots absolute bottom-1.5 inset-x-0 flex justify-center gap-1 z-10">
+          ${p.images.map((_, idx) => `<span class="gallery-dot w-1.5 h-1.5 rounded-full transition-colors ${idx === 0 ? 'bg-teal-700' : 'bg-teal-700/25'}" data-dot="${idx}"></span>`).join('')}
+        </div>
       </div>
-      <div class="p-3.5 flex flex-col flex-1">
-        <p class="text-sm font-medium text-ink-900 clamp-2 flex-1">${p[currentLang]}</p>
-        <div class="flex items-center gap-1 mt-2 text-amber-500 text-xs">
+      <div class="p-3 flex flex-col flex-1">
+        <p class="text-xs sm:text-sm font-medium text-ink-900 clamp-2 flex-1">${p[currentLang]}</p>
+        <div class="flex items-center gap-1 mt-1.5 text-amber-500 text-xs">
           <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg>
           <span class="nums">${p.rating}</span>
         </div>
-        <div class="mt-2.5 flex items-center justify-between gap-2">
-          <span class="font-mono font-semibold text-teal-800 text-sm nums">${formatMoney(p.price, p.currency)}</span>
-          <button type="button" data-add="${p.id}" class="h-8 px-3 rounded-full bg-teal-50 text-teal-800 text-xs font-display font-bold hover:bg-teal-700 hover:text-white transition-colors">${T[currentLang].addToCart}</button>
+        <div class="mt-2 flex items-center justify-between gap-2">
+          <span class="font-mono font-semibold text-teal-800 text-xs sm:text-sm nums">${formatMoney(p.price, p.currency)}</span>
+          <button type="button" data-add="${p.id}" class="h-7 px-2.5 rounded-full bg-teal-50 text-teal-800 text-[11px] font-display font-bold hover:bg-teal-700 hover:text-white transition-colors">${T[currentLang].addToCart}</button>
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+}
 
-  grid.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => {
-    addToCart(btn.getAttribute('data-add'));
-    trackEvent('add_to_cart', { product_id: btn.getAttribute('data-add') });
-  }));
+function viewAllTileHtml(c, total){
+  return `
+    <button type="button" data-view-all="${c.id}" class="view-all-tile group rounded-2xl border-2 border-dashed border-teal-200 hover:border-teal-600 hover:bg-teal-50 transition-colors flex flex-col items-center justify-center gap-2 text-center p-4 aspect-square sm:aspect-auto sm:h-full min-h-[10rem]">
+      <span class="w-10 h-10 rounded-full bg-teal-50 text-teal-700 group-hover:bg-teal-700 group-hover:text-white flex items-center justify-center transition-colors">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+      </span>
+      <span class="text-sm font-display font-bold text-teal-800">${T[currentLang].viewAll}</span>
+      <span class="text-xs text-slate-500 nums">${total} ${T[currentLang].itemsCount}</span>
+    </button>
+  `;
+}
+
+function renderCatalogRails(){
+  const wrap = document.getElementById('catalogRails');
+  const PREVIEW_COUNT = 5;
+  wrap.innerHTML = CATALOG.map(c => {
+    const items = PRODUCTS.filter(p => p.cat === c.id);
+    const preview = items.slice(0, PREVIEW_COUNT);
+    return `
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <button type="button" data-view-all="${c.id}" class="font-display font-extrabold text-xl md:text-2xl text-ink-900 flex items-center gap-2 hover:text-teal-700 transition-colors">
+            <span class="text-teal-700">${iconSvg(c.icon, 'w-5 h-5')}</span>${c[currentLang]}
+          </button>
+          <button type="button" data-view-all="${c.id}" class="text-sm font-display font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-1 shrink-0">
+            ${T[currentLang].viewAll}
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          ${preview.map(p => productCardHtml(p)).join('')}
+          ${viewAllTileHtml(c, items.length)}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderFooterCategories(){
   const ul = document.getElementById('footerCatList');
-  ul.innerHTML = CATALOG.map(c => `<li><a href="#shop-by-category" class="hover:text-cyan-400 transition-colors">${c[currentLang]}</a></li>`).join('');
+  ul.innerHTML = CATALOG.map(c => `<li><button type="button" data-view-all="${c.id}" class="hover:text-cyan-400 transition-colors">${c[currentLang]}</button></li>`).join('');
 }
 
 function addToCart(productId){
@@ -1595,6 +1731,50 @@ document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer)
 drawerBackdrop.addEventListener('click', closeDrawer);
 document.getElementById('drawerSellBtn').addEventListener('click', () => { closeDrawer(); openSubmitModal(); });
 
+// Catalog interactions: image gallery cycling, add-to-cart, opening category pages and product detail.
+// Delegated on document so it covers the homepage rails, the category page grid, and the product modal alike.
+document.addEventListener('click', (e) => {
+  const prevBtn = e.target.closest('.gallery-prev');
+  const nextBtn = e.target.closest('.gallery-next');
+  if (prevBtn || nextBtn){
+    e.preventDefault();
+    const gallery = (prevBtn || nextBtn).closest('[data-gallery]');
+    const slides = gallery.querySelectorAll('.gallery-slide');
+    const dots = gallery.querySelectorAll('.gallery-dot');
+    let idx = parseInt(gallery.getAttribute('data-index'), 10);
+    idx = prevBtn ? (idx - 1 + slides.length) % slides.length : (idx + 1) % slides.length;
+    gallery.setAttribute('data-index', String(idx));
+    slides.forEach((s, i) => { s.classList.toggle('opacity-100', i === idx); s.classList.toggle('opacity-0', i !== idx); s.classList.toggle('pointer-events-none', i !== idx); });
+    dots.forEach((d, i) => { d.classList.toggle('bg-teal-700', i === idx); d.classList.toggle('bg-teal-700/25', i !== idx); });
+    return;
+  }
+
+  const addBtn = e.target.closest('[data-add]');
+  if (addBtn){
+    e.stopPropagation();
+    addToCart(addBtn.getAttribute('data-add'));
+    trackEvent('add_to_cart', { product_id: addBtn.getAttribute('data-add') });
+    return;
+  }
+
+  const viewAllBtn = e.target.closest('[data-view-all]');
+  if (viewAllBtn){
+    location.hash = `category/${viewAllBtn.getAttribute('data-view-all')}`;
+    return;
+  }
+
+  const pageLink = e.target.closest('[data-page-link]');
+  if (pageLink){
+    location.hash = `category/${pageLink.getAttribute('data-page-link')}`;
+    return;
+  }
+
+  const card = e.target.closest('[data-product-id]');
+  if (card){
+    location.hash = `product/${card.getAttribute('data-product-id')}`;
+  }
+});
+
 // Cart drawer
 const cartDrawer = document.getElementById('cartDrawer');
 const cartDrawerBackdrop = document.getElementById('cartDrawerBackdrop');
@@ -1676,6 +1856,145 @@ document.getElementById('submitModalCloseBtn').addEventListener('click', closeSu
 submitModalBackdrop.addEventListener('click', closeSubmitModal);
 document.getElementById('submitSuccessCloseBtn').addEventListener('click', closeSubmitModal);
 
+// Category page (full browsable view of one category) — an in-flow view swap, not an overlay,
+// so the global header stays visible and functional the whole time.
+const homeView = document.getElementById('homeView');
+const categoryPageView = document.getElementById('categoryPageView');
+const CATEGORY_PAGE_SIZE = 20;
+function paginationWindow(current, total){
+  const delta = 1;
+  const window = [];
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) window.push(i);
+  if (current - delta > 2) window.unshift('…');
+  if (current + delta < total - 1) window.push('…');
+  window.unshift(1);
+  if (total > 1) window.push(total);
+  return window;
+}
+function paginationHtml(catId, page, totalPages){
+  if (totalPages <= 1) return '';
+  const navBtn = (targetPage, disabled, label, iconPath) => `
+    <button type="button" data-page-link="${catId}/${targetPage}" ${disabled ? 'disabled' : ''} class="shrink-0 whitespace-nowrap w-9 h-9 sm:w-auto sm:px-3 rounded-full text-sm font-display font-semibold border border-teal-900/15 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-teal-50 transition-colors flex items-center justify-center gap-1" aria-label="${label}">
+      ${iconPath === 'prev' ? `<svg class="w-3.5 h-3.5 rtl:-scale-x-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>` : ''}
+      <span class="hidden sm:inline">${label}</span>
+      ${iconPath === 'next' ? `<svg class="w-3.5 h-3.5 rtl:-scale-x-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></svg>` : ''}
+    </button>`;
+  return `
+    <nav class="mt-8 flex items-center justify-center gap-1.5" aria-label="Pagination">
+      ${navBtn(Math.max(1, page - 1), page === 1, T[currentLang].pagePrev, 'prev')}
+      ${paginationWindow(page, totalPages).map(n => n === '…'
+        ? `<span class="shrink-0 w-9 h-9 flex items-center justify-center text-sm text-slate-400 select-none">…</span>`
+        : `<button type="button" data-page-link="${catId}/${n}" class="shrink-0 w-9 h-9 rounded-full text-sm font-display font-semibold nums transition-colors ${n === page ? 'bg-teal-700 text-white' : 'hover:bg-teal-50 text-ink-900'}" aria-current="${n === page ? 'page' : 'false'}">${n}</button>`
+      ).join('')}
+      ${navBtn(Math.min(totalPages, page + 1), page === totalPages, T[currentLang].pageNext, 'next')}
+    </nav>
+  `;
+}
+function openCategoryPage(catId, pushHash = true, page = 1){
+  const cat = CATALOG.find(c => c.id === catId);
+  if (!cat) return;
+  closeDrawer(); closeSubmitModal(); closeCartDrawer();
+  const items = PRODUCTS.filter(p => p.cat === catId);
+  const totalPages = Math.max(1, Math.ceil(items.length / CATEGORY_PAGE_SIZE));
+  page = Math.min(Math.max(1, page), totalPages);
+  const pageItems = items.slice((page - 1) * CATEGORY_PAGE_SIZE, page * CATEGORY_PAGE_SIZE);
+  document.getElementById('categoryPageIcon').innerHTML = iconSvg(cat.icon, 'w-5 h-5');
+  document.getElementById('categoryPageTitle').textContent = cat[currentLang];
+  document.getElementById('categoryPageCount').textContent = `· ${items.length} ${T[currentLang].itemsCount}`;
+  document.getElementById('categoryPageGrid').innerHTML = pageItems.map(p => productCardHtml(p)).join('');
+  document.getElementById('categoryPagePagination').innerHTML = paginationHtml(catId, page, totalPages);
+  homeView.classList.add('hidden');
+  categoryPageView.classList.remove('hidden');
+  window.scrollTo(0, 0);
+  const hashTarget = `category/${catId}${page > 1 ? '/' + page : ''}`;
+  if (pushHash && location.hash !== `#${hashTarget}`) location.hash = hashTarget;
+  trackEvent('category_page_view', { category: catId, page, items: items.length });
+}
+function closeCategoryPage(){
+  homeView.classList.remove('hidden');
+  categoryPageView.classList.add('hidden');
+  if (location.hash.startsWith('#category/')) history.pushState('', document.title, location.pathname + location.search);
+}
+document.getElementById('categoryPageBackBtn').addEventListener('click', closeCategoryPage);
+
+// Product detail modal
+const productModal = document.getElementById('productModal');
+const productModalBackdrop = document.getElementById('productModalBackdrop');
+function buildProductModalHtml(p){
+  const cat = CATALOG.find(c => c.id === p.cat);
+  return `
+    <div class="p-5 pt-2">
+      <div class="relative aspect-square rounded-2xl overflow-hidden" data-gallery data-index="0">
+        ${p.images.map((tint, idx) => `
+          <div class="gallery-slide absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${tint} ${idx === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}" data-slide="${idx}">
+            ${iconSvg(p.icon, 'w-20 h-20')}
+            <img src="https://picsum.photos/seed/${p.id}-${idx}/700/700" alt="" loading="lazy" width="700" height="700" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">
+          </div>
+        `).join('')}
+        ${p.tag ? `<span class="absolute top-3 start-3 text-xs font-display font-bold px-2.5 py-1 rounded-full z-10 ${p.tag === 'sale' ? 'bg-amber-400 text-amber-950' : 'bg-teal-700 text-white'}">${TAG_LABEL[p.tag][currentLang]}</span>` : ''}
+        <button type="button" class="gallery-prev absolute start-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 text-ink-900 flex items-center justify-center" aria-label="Previous image">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+        </button>
+        <button type="button" class="gallery-next absolute end-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/90 text-ink-900 flex items-center justify-center" aria-label="Next image">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></svg>
+        </button>
+        <div class="gallery-dots absolute bottom-2.5 inset-x-0 flex justify-center gap-1.5 z-10">
+          ${p.images.map((_, idx) => `<span class="gallery-dot w-2 h-2 rounded-full transition-colors ${idx === 0 ? 'bg-teal-700' : 'bg-teal-700/25'}" data-dot="${idx}"></span>`).join('')}
+        </div>
+      </div>
+
+      ${cat ? `<button type="button" data-view-all="${cat.id}" class="mt-4 inline-flex items-center gap-1.5 text-xs font-display font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 transition-colors rounded-full px-3 py-1.5">${iconSvg(cat.icon, 'w-3.5 h-3.5')}${cat[currentLang]}</button>` : ''}
+
+      <h2 id="productModalTitle" class="font-display font-bold text-xl text-ink-900 mt-3">${p[currentLang]}</h2>
+      <div class="flex items-center gap-1.5 mt-2 text-amber-500 text-sm">
+        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg>
+        <span class="nums">${p.rating}</span>
+      </div>
+      <p class="text-sm text-slate-500 mt-3 leading-relaxed">${T[currentLang].productGenericDesc}</p>
+
+      <div class="mt-5 flex items-center justify-between gap-3">
+        <span class="font-mono font-bold text-teal-800 text-2xl nums">${formatMoney(p.price, p.currency)}</span>
+        <button type="button" data-add="${p.id}" class="h-12 px-7 rounded-full bg-teal-700 hover:bg-teal-600 transition-colors text-white font-display font-bold text-sm">${T[currentLang].addToCart}</button>
+      </div>
+    </div>
+  `;
+}
+function openProductModal(productId, pushHash = true){
+  const p = PRODUCTS.find(pr => pr.id === productId);
+  if (!p) return;
+  document.getElementById('productModalContent').innerHTML = buildProductModalHtml(p);
+  productModalBackdrop.classList.remove('hidden');
+  productModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  if (pushHash && location.hash !== `#product/${productId}`) location.hash = `product/${productId}`;
+  trackEvent('product_view', { product_id: productId });
+}
+function closeProductModal(){
+  productModalBackdrop.classList.add('hidden');
+  productModal.classList.add('hidden');
+  document.body.style.overflow = '';
+  if (location.hash.startsWith('#product/')) history.pushState('', document.title, location.pathname + location.search);
+}
+document.getElementById('productModalCloseBtn').addEventListener('click', closeProductModal);
+productModalBackdrop.addEventListener('click', closeProductModal);
+
+// Hash router: makes category/product views linkable and lets browser back/forward work
+function routeFromHash(){
+  const hash = location.hash.replace(/^#/, '');
+  if (hash.startsWith('category/')) {
+    const [catId, pageStr] = hash.slice('category/'.length).split('/');
+    openCategoryPage(catId, false, pageStr ? parseInt(pageStr, 10) : 1);
+    closeProductModal();
+  } else if (hash.startsWith('product/')) {
+    openProductModal(hash.slice('product/'.length), false);
+  } else {
+    closeCategoryPage();
+    closeProductModal();
+  }
+}
+window.addEventListener('hashchange', routeFromHash);
+routeFromHash();
+
 submitForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const hasImage = document.getElementById('f_image').files.length > 0;
@@ -1703,6 +2022,8 @@ document.querySelectorAll('.bottom-nav-btn').forEach(btn => btn.addEventListener
 // Escape key closes any open overlay
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (!productModal.classList.contains('hidden')) { closeProductModal(); return; }
+  if (!categoryPageView.classList.contains('hidden')) { closeCategoryPage(); return; }
   if (!drawer.classList.contains('hidden')) closeDrawer();
   if (!cartDrawer.classList.contains('hidden')) closeCartDrawer();
   if (!submitModal.classList.contains('hidden')) closeSubmitModal();
