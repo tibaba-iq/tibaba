@@ -1267,7 +1267,25 @@ const VARIANT_MODIFIERS = [
   { en:' — Travel Size', ar:' — حجم السفر', mult:0.6 }
 ];
 const TAG_CYCLE = ['new', null, null, 'sale', null, null, 'verified', null, null, null];
-const IMAGE_TINTS = ['bg-teal-50 text-teal-300', 'bg-cyan-100/70 text-cyan-500', 'bg-sand-50 text-teal-400'];
+// Per-category image seeds for picsum.photos.
+// Each template entry maps to 3 seeds → 3 different photos per product gallery slide.
+// Seeds are fixed strings so the same product always shows the same photo.
+const CATEGORY_SEEDS = {
+  devices:         [['medical-device','bp-monitor','thermometer'],['oximeter','medical2','glucometer'],['wheelchair','mobility','knee-brace'],['thermometer2','stethoscope','medical3'],['cane-walking','orthopedic','device2'],['glucose-strip','medical4','monitor2']],
+  supplements:     [['vitamin-c','effervescent','supplement'],['kids-vitamins','gummies','multivitamin'],['omega3','fish-oil','capsules'],['vitamin-d','softgel','supplement2'],['probiotic','gut-health','capsule2'],['collagen','peptides','powder']],
+  'personal-care': [['n95-mask','face-mask','ppe'],['hand-sanitizer','hygiene','gel'],['sunscreen','spf','skincare'],['nitrile-gloves','latex-gloves','gloves']],
+  'mother-baby':   [['prenatal-vitamin','maternity','supplement3'],['baby-thermometer','infant','baby'],['dha-capsule','prenatal2','omega'],['nasal-aspirator','baby-care','infant2']],
+  'first-aid':     [['first-aid-kit','emergency-kit','medical-kit'],['bandage','adhesive','wound-care'],['antiseptic','wound-spray','disinfect'],['elastic-bandage','compression','wrap']],
+  'clinic-supplies':[['syringe','injection','medical-supply'],['exam-gloves','medical-gloves','latex'],['surgical-mask','face-mask2','medical-mask'],['disinfect-wipes','alcohol-wipes','sterile']]
+};
+
+function getProductImages(p){
+  const catSeeds = CATEGORY_SEEDS[p.cat];
+  if (!catSeeds) return ['medical','health','pharmacy'];
+  const templateIdx = PRODUCTS ? (PRODUCTS.filter(pr => pr.cat === p.cat).indexOf(p) % catSeeds.length) : 0;
+  const base = catSeeds[templateIdx] || catSeeds[0];
+  return base; // 3 seed strings
+}
 
 function roundPrice(amount, currency){
   return currency === 'USD' ? Math.max(1, Math.round(amount)) : Math.max(500, Math.round(amount / 250) * 250);
@@ -1291,7 +1309,7 @@ function generateCatalog(){
         tag: TAG_CYCLE[i % TAG_CYCLE.length],
         icon: catMeta.icon,
         rating: Math.round((tpl.rating - 0.1 + (i % 5) * 0.05) * 10) / 10,
-        images: IMAGE_TINTS
+        images: ['img0', 'img1', 'img2'] // resolved at render time via getProductImages()
       });
     }
   });
@@ -1471,10 +1489,10 @@ function productCardHtml(p){
   return `
     <div class="product-card group rounded-2xl border border-teal-900/10 bg-white overflow-hidden hover:shadow-card transition-shadow flex flex-col cursor-pointer" data-product-id="${p.id}">
       <div class="relative aspect-square" data-gallery data-index="0">
-        ${p.images.map((tint, idx) => `
-          <div class="gallery-slide absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${tint} ${idx === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}" data-slide="${idx}">
-            ${iconSvg(p.icon, 'w-12 h-12')}
-            <img src="https://picsum.photos/seed/${p.id}-${idx}/400/400" alt="" loading="lazy" width="400" height="400" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">
+        ${getProductImages(p).map((seed, idx) => `
+          <div class="gallery-slide absolute inset-0 bg-teal-50 flex items-center justify-center transition-opacity duration-200 ${idx === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}" data-slide="${idx}">
+            ${iconSvg(p.icon, 'w-12 h-12 text-teal-200')}
+            <img src="https://picsum.photos/seed/${seed}/400/400" alt="" loading="lazy" decoding="async" width="400" height="400" class="absolute inset-0 w-full h-full object-cover" onerror="this.style.display='none'">
           </div>
         `).join('')}
         ${p.tag ? `<span class="absolute top-2 start-2 text-[10px] font-display font-bold px-2 py-0.5 rounded-full z-10 ${p.tag === 'sale' ? 'bg-amber-400 text-amber-950' : 'bg-teal-700 text-white'}">${TAG_LABEL[p.tag][currentLang]}</span>` : ''}
@@ -1925,10 +1943,10 @@ function buildProductModalHtml(p){
   return `
     <div class="p-5 pt-2">
       <div class="relative aspect-square rounded-2xl overflow-hidden" data-gallery data-index="0">
-        ${p.images.map((tint, idx) => `
-          <div class="gallery-slide absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${tint} ${idx === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}" data-slide="${idx}">
-            ${iconSvg(p.icon, 'w-20 h-20')}
-            <img src="https://picsum.photos/seed/${p.id}-${idx}/700/700" alt="" loading="lazy" width="700" height="700" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">
+        ${getProductImages(p).map((seed, idx) => `
+          <div class="gallery-slide absolute inset-0 bg-teal-50 flex items-center justify-center transition-opacity duration-200 ${idx === 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}" data-slide="${idx}">
+            ${iconSvg(p.icon, 'w-20 h-20 text-teal-200')}
+            <img src="https://picsum.photos/seed/${seed}/700/700" alt="" loading="lazy" decoding="async" width="700" height="700" class="absolute inset-0 w-full h-full object-cover" onerror="this.style.display='none'">
           </div>
         `).join('')}
         ${p.tag ? `<span class="absolute top-3 start-3 text-xs font-display font-bold px-2.5 py-1 rounded-full z-10 ${p.tag === 'sale' ? 'bg-amber-400 text-amber-950' : 'bg-teal-700 text-white'}">${TAG_LABEL[p.tag][currentLang]}</span>` : ''}

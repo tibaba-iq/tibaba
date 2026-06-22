@@ -1,0 +1,4 @@
+/*
+  Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; img-src 'self' data: blob: https://picsum.photos https://fastly.picsum.photos https://i.picsum.photos; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:;
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
