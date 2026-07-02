@@ -508,9 +508,7 @@ c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
 -7 54 -26z"/>
 </g>
 </svg>
-        <span class="font-display font-extrabold text-xl md:text-2xl text-teal-800 leading-none">
-          <span lang="en" class="ltr-only">Tibaba</span><span class="text-teal-500 mx-1">·</span><span lang="ar" dir="rtl" class="font-display">طبابة</span>
-        </span>
+        <span class="hidden sm:block font-display font-bold text-sm md:text-base lg:text-lg text-teal-800 leading-tight" data-i18n="brandTagline">سوق الاجهزة الطبية / العراق</span>
       </a>
 
       <!-- Desktop search -->
@@ -541,6 +539,10 @@ c31 -39 29 -117 -4 -149 -56 -56 -125 -15 -125 75 0 63 28 100 75 100 24 0 39
           <span id="langToggleHeaderLabel">AR</span>
         </button>
       </div>
+    </div>
+    <!-- Mobile-only tagline strip — visible only below sm breakpoint -->
+    <div class="sm:hidden px-4 pb-2.5 -mt-0.5">
+      <p class="text-[11px] font-display font-semibold text-teal-700 leading-tight truncate" data-i18n="brandTagline">سوق الاجهزة الطبية / العراق</p>
     </div>
   </div>
 
@@ -1330,7 +1332,7 @@ const PRODUCTS = generateCatalog();
 
 const T = {
   en: {
-    skipToContent:'Skip to content', brandHome:'Tibaba home', topbarMsg:'Verified medical sellers across Iraq · Cash on delivery available',
+    skipToContent:'Skip to content', brandHome:'Tibaba home', brandTagline:'Medical Equipment Market in Iraq', topbarMsg:'Verified medical sellers across Iraq · Cash on delivery available',
     searchPlaceholder:'Search medicines, devices, vitamins…', sellWithUs:'Sell with us', categories:'Categories', submitProduct:'Submit a Product', allCategories:'All Categories',
     addToCart:'Add', viewAll:'View all', itemsCount:'items',
     cartTitle:'Your cart', cartEmpty:'Your cart is empty', cartEmptySub:'Add a product to get started.',
@@ -1356,7 +1358,7 @@ const T = {
     modalSuccessTitle:'Submission received', modalSuccessSub:'Our team will contact you on WhatsApp within 24 hours.', modalSuccessClose:'Done'
   },
   ar: {
-    skipToContent:'تخطّي إلى المحتوى', brandHome:'الصفحة الرئيسية لطبابة', topbarMsg:'بائعون طبيون موثوقون في جميع أنحاء العراق · الدفع عند الاستلام متاح',
+    skipToContent:'تخطّي إلى المحتوى', brandHome:'الصفحة الرئيسية لطبابة', brandTagline:'سوق الاجهزة الطبية / العراق', topbarMsg:'بائعون طبيون موثوقون في جميع أنحاء العراق · الدفع عند الاستلام متاح',
     searchPlaceholder:'ابحث عن أدوية، أجهزة، فيتامينات…', sellWithUs:'بيع معنا', categories:'الفئات', submitProduct:'أضف منتجاً', allCategories:'كل الفئات',
     addToCart:'أضف', viewAll:'عرض الكل', itemsCount:'منتج',
     cartTitle:'سلة التسوق', cartEmpty:'سلة التسوق فارغة', cartEmptySub:'أضف منتجاً للبدء.',
